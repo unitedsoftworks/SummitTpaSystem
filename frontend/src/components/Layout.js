@@ -5,7 +5,7 @@ import api from '../api/client';
 const portalConfigs = {
   staff: {
     label: 'Staff Portal',
-    color: '#3b82f6',
+    color: '#0D9488',
     groups: [
       {
         label: 'People',
@@ -55,7 +55,7 @@ const portalConfigs = {
   },
   employer: {
     label: 'Employer Portal',
-    color: '#16a34a',
+    color: '#059669',
     groups: [
       {
         label: 'Manage',
@@ -70,15 +70,25 @@ const portalConfigs = {
   },
   employee: {
     label: 'Employee Portal',
-    color: '#7c3aed',
+    color: '#2DD4BF',
     groups: [],
   },
   broker: {
     label: 'Broker Portal',
-    color: '#ea580c',
+    color: '#F59E0B',
     groups: [],
   },
 };
+
+function SummitLogo({ size = 36 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none">
+      <path d="M20 104L52 16L64 16L32 104Z" fill="#0D9488" opacity="0.4"/>
+      <path d="M40 104L72 16L84 16L52 104Z" fill="#0D9488" opacity="0.65"/>
+      <path d="M60 104L92 16L104 16L72 104Z" fill="#0D9488"/>
+    </svg>
+  );
+}
 
 function Dropdown({ group, color, isActive, portalPrefix }) {
   const [open, setOpen] = useState(false);
@@ -129,8 +139,8 @@ function Dropdown({ group, color, isActive, portalPrefix }) {
         <div style={{
           position: 'absolute', top: '100%', left: 0,
           background: 'var(--card)', borderRadius: 12,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
-          border: '1px solid var(--border)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-light)',
           padding: 6, minWidth: 240, zIndex: 100,
           animation: 'dropIn 0.15s ease-out',
         }}>
@@ -144,10 +154,10 @@ function Dropdown({ group, color, isActive, portalPrefix }) {
                 style={{
                   display: 'block', padding: '10px 14px',
                   borderRadius: 8, textDecoration: 'none',
-                  background: active ? `${color}0a` : 'transparent',
+                  background: active ? `${color}15` : 'transparent',
                   transition: 'background 0.1s',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--table-row-hover)'; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
                 <div style={{ fontSize: 14, fontWeight: active ? 600 : 500, color: active ? color : 'var(--text)', marginBottom: 1 }}>
@@ -205,7 +215,7 @@ function SearchBar({ portal }) {
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
         style={{
           width: 36, height: 36, borderRadius: 8, border: 'none',
-          background: open ? 'var(--border)' : 'transparent',
+          background: open ? 'var(--border-light)' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.15s',
         }}
@@ -218,11 +228,11 @@ function SearchBar({ portal }) {
         <div style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 4,
           width: 380, background: 'var(--card)', borderRadius: 12,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
-          border: '1px solid var(--border)', zIndex: 200,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-light)', zIndex: 200,
           animation: 'dropIn 0.15s ease-out',
         }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
             <input
               ref={inputRef}
               value={query}
@@ -251,7 +261,7 @@ function SearchBar({ portal }) {
                 {results.employees.map(e => (
                   <div key={e.id} onClick={() => goTo(`/staff/employees/${e.id}`)}
                     style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', transition: 'background 0.1s' }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = '#f8fafc'}
+                    onMouseEnter={ev => ev.currentTarget.style.background = 'var(--table-row-hover)'}
                     onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}
                   >
                     <div style={{ fontSize: 14, fontWeight: 500 }}>{e.full_name}</div>
@@ -266,7 +276,7 @@ function SearchBar({ portal }) {
                 {results.employers.map(e => (
                   <div key={e.id} onClick={() => goTo(`/staff/employers/${e.id}`)}
                     style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', transition: 'background 0.1s' }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = '#f8fafc'}
+                    onMouseEnter={ev => ev.currentTarget.style.background = 'var(--table-row-hover)'}
                     onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}
                   >
                     <div style={{ fontSize: 14, fontWeight: 500 }}>{e.name}</div>
@@ -281,7 +291,7 @@ function SearchBar({ portal }) {
                 {results.claims.map(c => (
                   <div key={c.id} onClick={() => goTo(`/staff/claims/${c.id}`)}
                     style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', transition: 'background 0.1s' }}
-                    onMouseEnter={ev => ev.currentTarget.style.background = '#f8fafc'}
+                    onMouseEnter={ev => ev.currentTarget.style.background = 'var(--table-row-hover)'}
                     onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}
                   >
                     <div style={{ fontSize: 14, fontWeight: 500 }}>{c.claim_number}</div>
@@ -294,33 +304,6 @@ function SearchBar({ portal }) {
         </div>
       )}
     </div>
-  );
-}
-
-function ThemeToggle() {
-  const [dark, setDark] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark');
-  const toggle = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
-    try { localStorage.setItem('summit-theme', next ? 'dark' : 'light'); } catch(e) {}
-  };
-  return (
-    <button onClick={toggle} style={{
-      width: 36, height: 36, borderRadius: 8, border: 'none',
-      background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      cursor: 'pointer', color: 'var(--text-muted)', padding: 0, transition: 'all 0.15s',
-    }}>
-      {dark ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-        </svg>
-      )}
-    </button>
   );
 }
 
@@ -355,21 +338,14 @@ export default function Layout({ portal, children }) {
   const navigate = useNavigate();
   const config = portalConfigs[portal] || portalConfigs.staff;
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('summit-theme');
-      if (saved) document.documentElement.setAttribute('data-theme', saved);
-    } catch(e) {}
-  }, []);
-
   const dashPath = `/${portal}`;
   const isDash = location.pathname === dashPath;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{
-        background: 'var(--card)',
-        borderBottom: '1px solid var(--border)',
+        background: 'var(--nav-bg)',
+        borderBottom: '1px solid var(--border-light)',
         position: 'sticky', top: 0, zIndex: 50,
       }}>
         <div style={{
@@ -377,33 +353,26 @@ export default function Layout({ portal, children }) {
           padding: '0 32px', height: 60,
           display: 'flex', alignItems: 'center', gap: 0,
         }}>
-          {/* Logo */}
           <div
             onClick={() => navigate('/')}
             style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, marginRight: 8, flexShrink: 0 }}
           >
-            <svg width="30" height="30" viewBox="0 0 40 40" fill="none">
-              <rect width="40" height="40" rx="10" fill={config.color}/>
-              <path d="M12 28L20 12L28 28H12Z" fill="white" opacity="0.9"/>
-              <path d="M16 28L20 20L24 28H16Z" fill="white"/>
-            </svg>
-            <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text)' }}>
-              Summit
+            <SummitLogo size={36} />
+            <span style={{ fontFamily: 'Lexend, sans-serif', fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text)' }}>
+              Summit<span style={{ color: '#0D9488' }}>Health</span>
             </span>
           </div>
 
-          {/* Portal badge */}
           <span style={{
             padding: '4px 10px', borderRadius: 6,
             fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
             letterSpacing: '0.5px',
-            background: `${config.color}10`, color: config.color,
+            background: `${config.color}15`, color: config.color,
             marginRight: 20, flexShrink: 0,
           }}>
             {config.label}
           </span>
 
-          {/* Nav */}
           <nav style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
             <Link
               to={dashPath}
@@ -421,9 +390,7 @@ export default function Layout({ portal, children }) {
             ))}
           </nav>
 
-          {/* Right side: search, notifications, portal switch */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <ThemeToggle />
             {portal === 'staff' && <SearchBar portal={portal} />}
             {portal === 'staff' && (
               <Link
@@ -431,7 +398,7 @@ export default function Layout({ portal, children }) {
                 style={{
                   width: 36, height: 36, borderRadius: 8,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: location.pathname === '/staff/notifications' ? `${config.color}10` : 'transparent',
+                  background: location.pathname === '/staff/notifications' ? `${config.color}15` : 'transparent',
                   color: location.pathname === '/staff/notifications' ? config.color : 'var(--text-muted)',
                   transition: 'all 0.15s', textDecoration: 'none',
                 }}
@@ -444,7 +411,7 @@ export default function Layout({ portal, children }) {
             <button
               onClick={() => navigate('/')}
               style={{
-                background: 'none', border: '1px solid var(--border)',
+                background: 'none', border: '1px solid var(--border-light)',
                 padding: '7px 14px', borderRadius: 8, fontSize: 13,
                 fontWeight: 500, color: 'var(--text-secondary)',
                 display: 'flex', alignItems: 'center', gap: 6,

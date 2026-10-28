@@ -1,26 +1,26 @@
 import React from 'react';
 
 const colors = {
-  active: { bg: '#e6f4ea', text: '#1e7e34' },
-  carrier_confirmed: { bg: '#e3f2fd', text: '#1565c0' },
-  pending: { bg: '#fff3e0', text: '#e65100' },
-  terminated: { bg: '#fce4ec', text: '#c62828' },
-  on_leave: { bg: '#f3e5f5', text: '#6a1b9a' },
-  received: { bg: '#fff3e0', text: '#e65100' },
-  in_review: { bg: '#e3f2fd', text: '#1565c0' },
-  pending_info: { bg: '#fff8e1', text: '#f57f17' },
-  approved: { bg: '#e6f4ea', text: '#1e7e34' },
-  denied: { bg: '#fce4ec', text: '#c62828' },
-  matched: { bg: '#e6f4ea', text: '#1e7e34' },
-  discrepancy: { bg: '#fce4ec', text: '#c62828' },
-  resolved: { bg: '#e3f2fd', text: '#1565c0' },
-  paid: { bg: '#e8eaf6', text: '#283593' },
-  processed: { bg: '#e6f4ea', text: '#1e7e34' },
-  sent_to_employer: { bg: '#e3f2fd', text: '#1565c0' },
+  active: { bg: 'rgba(5,150,105,0.15)', text: '#2DD4BF' },
+  carrier_confirmed: { bg: 'rgba(13,148,136,0.15)', text: '#2DD4BF' },
+  pending: { bg: 'rgba(245,158,11,0.15)', text: '#F59E0B' },
+  terminated: { bg: 'rgba(244,63,94,0.15)', text: '#F43F5E' },
+  on_leave: { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA' },
+  received: { bg: 'rgba(245,158,11,0.15)', text: '#F59E0B' },
+  in_review: { bg: 'rgba(13,148,136,0.15)', text: '#2DD4BF' },
+  pending_info: { bg: 'rgba(245,158,11,0.15)', text: '#FBBF24' },
+  approved: { bg: 'rgba(5,150,105,0.15)', text: '#34D399' },
+  denied: { bg: 'rgba(244,63,94,0.15)', text: '#F43F5E' },
+  matched: { bg: 'rgba(5,150,105,0.15)', text: '#34D399' },
+  discrepancy: { bg: 'rgba(244,63,94,0.15)', text: '#F43F5E' },
+  resolved: { bg: 'rgba(13,148,136,0.15)', text: '#2DD4BF' },
+  paid: { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA' },
+  processed: { bg: 'rgba(5,150,105,0.15)', text: '#34D399' },
+  sent_to_employer: { bg: 'rgba(13,148,136,0.15)', text: '#2DD4BF' },
 };
 
 export default function StatusBadge({ status }) {
-  const c = colors[status] || { bg: '#eee', text: '#666' };
+  const c = colors[status] || { bg: 'rgba(100,116,139,0.15)', text: '#94A3B8' };
   const label = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   return (
     <span style={{

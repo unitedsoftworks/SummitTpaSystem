@@ -12,7 +12,7 @@ const portals = [
         <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
       </svg>
     ),
-    color: '#3b82f6',
+    color: '#0D9488',
     path: '/staff',
   },
   {
@@ -25,7 +25,7 @@ const portals = [
         <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>
       </svg>
     ),
-    color: '#16a34a',
+    color: '#059669',
     path: '/employer',
   },
   {
@@ -38,7 +38,7 @@ const portals = [
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
       </svg>
     ),
-    color: '#7c3aed',
+    color: '#2DD4BF',
     path: '/employee',
   },
   {
@@ -51,7 +51,7 @@ const portals = [
         <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>
       </svg>
     ),
-    color: '#ea580c',
+    color: '#F59E0B',
     path: '/broker',
   },
 ];
@@ -62,7 +62,7 @@ export default function PortalSelect() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+      background: 'linear-gradient(135deg, #0B1120 0%, #0F172A 50%, #0B1120 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -76,22 +76,23 @@ export default function PortalSelect() {
           gap: 12,
           marginBottom: 12,
         }}>
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="#3b82f6"/>
-            <path d="M12 28L20 12L28 28H12Z" fill="white" opacity="0.9"/>
-            <path d="M16 28L20 20L24 28H16Z" fill="white"/>
+          <svg width="44" height="44" viewBox="0 0 120 120" fill="none">
+            <path d="M20 104L52 16L64 16L32 104Z" fill="#0D9488" opacity="0.4"/>
+            <path d="M40 104L72 16L84 16L52 104Z" fill="#0D9488" opacity="0.65"/>
+            <path d="M60 104L92 16L104 16L72 104Z" fill="#0D9488"/>
           </svg>
           <h1 style={{
+            fontFamily: 'Lexend, sans-serif',
             color: '#fff',
             fontSize: 32,
             fontWeight: 800,
             letterSpacing: '-1px',
           }}>
-            Summit TPA
+            Summit<span style={{ color: '#0D9488' }}>Health</span>
           </h1>
         </div>
         <p style={{
-          color: 'rgba(255,255,255,0.5)',
+          color: '#64748B',
           fontSize: 16,
           fontWeight: 400,
         }}>
@@ -111,9 +112,9 @@ export default function PortalSelect() {
             key={portal.key}
             onClick={() => navigate(portal.path)}
             style={{
-              background: 'rgba(255,255,255,0.04)',
+              background: 'rgba(30,41,59,0.5)',
               backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid #1E293B',
               borderRadius: 16,
               padding: 28,
               cursor: 'pointer',
@@ -122,13 +123,13 @@ export default function PortalSelect() {
               overflow: 'hidden',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+              e.currentTarget.style.background = 'rgba(30,41,59,0.8)';
               e.currentTarget.style.borderColor = portal.color;
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+              e.currentTarget.style.background = 'rgba(30,41,59,0.5)';
+              e.currentTarget.style.borderColor = '#1E293B';
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
@@ -136,7 +137,8 @@ export default function PortalSelect() {
               {portal.icon}
             </div>
             <h3 style={{
-              color: '#fff',
+              fontFamily: 'Lexend, sans-serif',
+              color: '#E2E8F0',
               fontSize: 18,
               fontWeight: 700,
               marginBottom: 2,
@@ -154,7 +156,7 @@ export default function PortalSelect() {
               {portal.subtitle}
             </div>
             <p style={{
-              color: 'rgba(255,255,255,0.45)',
+              color: '#64748B',
               fontSize: 13,
               lineHeight: 1.5,
             }}>
@@ -165,11 +167,11 @@ export default function PortalSelect() {
       </div>
 
       <p style={{
-        color: 'rgba(255,255,255,0.2)',
+        color: '#334155',
         fontSize: 12,
         marginTop: 40,
       }}>
-        Demo Environment &middot; All data is fictional
+        Summit Health Administration
       </p>
     </div>
   );

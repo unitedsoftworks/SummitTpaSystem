@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function StatCard({ label, value, color = '#3b82f6', sub }) {
+export default function StatCard({ label, value, color = '#0D9488', sub }) {
   return (
     <div style={{
       background: 'var(--card)',

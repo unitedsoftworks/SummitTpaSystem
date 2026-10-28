@@ -6,19 +6,19 @@ import StatusBadge from '../components/StatusBadge';
 const fmt = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
 const actionColors = {
-  carrier_confirm: { bg: '#dbeafe', color: '#1d4ed8', label: 'Confirm' },
-  activate: { bg: '#dcfce7', color: '#15803d', label: 'Activate' },
-  terminate: { bg: '#fee2e2', color: '#dc2626', label: 'Terminate' },
-  add_member: { bg: '#ede9fe', color: '#6d28d9', label: 'Add Member' },
-  remove_member: { bg: '#ffedd5', color: '#c2410c', label: 'Remove' },
-  generate_deductions: { bg: '#e0f2fe', color: '#0369a1', label: 'Deductions' },
-  resolve_invoice: { bg: '#dcfce7', color: '#15803d', label: 'Resolve' },
-  pay_invoice: { bg: '#dcfce7', color: '#15803d', label: 'Pay' },
-  claim_paid: { bg: '#dcfce7', color: '#15803d', label: 'Paid' },
-  claim_approved: { bg: '#dcfce7', color: '#15803d', label: 'Approved' },
-  claim_denied: { bg: '#fee2e2', color: '#dc2626', label: 'Denied' },
-  eligibility_sent: { bg: '#e0f2fe', color: '#0369a1', label: 'Eligibility' },
-  eligibility_generated: { bg: '#e0f2fe', color: '#0369a1', label: 'Eligibility' },
+  carrier_confirm: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Confirm' },
+  activate: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Activate' },
+  terminate: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: 'Terminate' },
+  add_member: { bg: 'rgba(139,92,246,0.15)', color: '#A78BFA', label: 'Add Member' },
+  remove_member: { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: 'Remove' },
+  generate_deductions: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Deductions' },
+  resolve_invoice: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Resolve' },
+  pay_invoice: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Pay' },
+  claim_paid: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Paid' },
+  claim_approved: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Approved' },
+  claim_denied: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: 'Denied' },
+  eligibility_sent: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Eligibility' },
+  eligibility_generated: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Eligibility' },
 };
 
 export default function Dashboard() {
@@ -78,10 +78,10 @@ export default function Dashboard() {
 
       {/* Primary KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Active Employees" value={data.total_employees} color="#3b82f6" icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" />
-        <KpiCard label="Active Enrollments" value={data.active_enrollments} sub={`${data.pending_enrollments} pending`} color="#16a34a" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        <KpiCard label="Monthly Premiums" value={fmt(data.total_monthly_premiums)} color="#7c3aed" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        <KpiCard label="Open Claims" value={data.open_claims} color="#ea580c" icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <KpiCard label="Active Employees" value={data.total_employees} color="#2DD4BF" icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" />
+        <KpiCard label="Active Enrollments" value={data.active_enrollments} sub={`${data.pending_enrollments} pending`} color="#059669" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        <KpiCard label="Monthly Premiums" value={fmt(data.total_monthly_premiums)} color="#8B5CF6" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <KpiCard label="Open Claims" value={data.open_claims} color="#F59E0B" icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </div>
 
       {/* Financial row */}
