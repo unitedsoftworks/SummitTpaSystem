@@ -37,6 +37,7 @@ import Dependents from './pages/Dependents';
 import Associations from './pages/Associations';
 import EmployerInvoices from './pages/EmployerInvoices';
 import Exceptions from './pages/Exceptions';
+import NewEnrollment from './pages/NewEnrollment';
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/staff/employers/:id" element={<Layout portal="staff"><EmployerDetail /></Layout>} />
         <Route path="/staff/employees" element={<Layout portal="staff"><Employees /></Layout>} />
         <Route path="/staff/employees/:id" element={<Layout portal="staff"><EmployeeDetail /></Layout>} />
+        <Route path="/staff/employees/:id/new-coverage" element={<Layout portal="staff"><NewEnrollment /></Layout>} />
         <Route path="/staff/enrollments" element={<Layout portal="staff"><Enrollments /></Layout>} />
         <Route path="/staff/enrollments/:id" element={<Layout portal="staff"><EnrollmentEdit /></Layout>} />
         <Route path="/staff/claims" element={<Layout portal="staff"><Claims /></Layout>} />

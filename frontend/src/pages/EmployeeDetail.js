@@ -228,7 +228,7 @@ export default function EmployeeDetail() {
       <div style={{ ...cardStyle, marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={cardHeading}>Policies</h3>
-          <button className="btn-outline btn-sm">+ Add new coverage</button>
+          <button className="btn-outline btn-sm" onClick={() => navigate(`/staff/employees/${id}/new-coverage`)}>+ Add new coverage</button>
         </div>
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
           <TabButton active={policyTab === 'active'} onClick={() => setPolicyTab('active')}>
