@@ -11,6 +11,7 @@ export default function ClaimDetail() {
   const [showApprove, setShowApprove] = useState(false);
   const [requestReason, setRequestReason] = useState('Medical records needed');
   const [approveData, setApproveData] = useState({ allowed: '', plan_pays: '', member_owes: '', deductible: '' });
+  const [deductibleAll, setDeductibleAll] = useState(true);
 
   const load = () => {
     api.get(`/claims/${id}/`).then(r => {
@@ -142,7 +143,7 @@ export default function ClaimDetail() {
             <Field label="Allowed" value={claim.allowed_amount ? `$${Number(claim.allowed_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Not decided yet'} muted={!claim.allowed_amount} />
             <Field label="Plan pays" value={claim.plan_pays ? `$${Number(claim.plan_pays).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'} />
             <Field label="Member owes" value={claim.member_owes ? `$${Number(claim.member_owes).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'} />
-            <Field label="Toward the deductible" value={claim.deductible_applied ? `$${Number(claim.deductible_applied).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'} />
+            <Field label="Towards deductible" value={claim.deductible_applied ? `$${Number(claim.deductible_applied).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'} />
             <Field label="Paid" value={claim.paid_amount ? `$${Number(claim.paid_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'} />
           </div>
         </div>
@@ -231,7 +232,8 @@ export default function ClaimDetail() {
                 onChange={e => {
                   const allowed = parseFloat(e.target.value) || 0;
                   const planPays = parseFloat(approveData.plan_pays) || 0;
-                  setApproveData({ ...approveData, allowed: e.target.value, member_owes: (allowed - planPays).toFixed(2) });
+                  const mo = (allowed - planPays).toFixed(2);
+                  setApproveData(prev => ({ ...prev, allowed: e.target.value, member_owes: mo, ...(deductibleAll ? { deductible: mo } : {}) }));
                 }}
                 style={inputStyle}
               />
@@ -245,7 +247,8 @@ export default function ClaimDetail() {
                 onChange={e => {
                   const planPays = parseFloat(e.target.value) || 0;
                   const allowed = parseFloat(approveData.allowed) || 0;
-                  setApproveData({ ...approveData, plan_pays: e.target.value, member_owes: (allowed - planPays).toFixed(2) });
+                  const mo = (allowed - planPays).toFixed(2);
+                  setApproveData(prev => ({ ...prev, plan_pays: e.target.value, member_owes: mo, ...(deductibleAll ? { deductible: mo } : {}) }));
                 }}
                 style={inputStyle}
               />
@@ -255,13 +258,30 @@ export default function ClaimDetail() {
               <input type="number" step="0.01" value={approveData.member_owes} readOnly style={{ ...inputStyle, background: 'var(--bg)' }} />
             </div>
             <div>
-              <label style={labelStyle}>Of that, toward the deductible ($)</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Towards deductible ($)</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={deductibleAll}
+                    onChange={e => {
+                      setDeductibleAll(e.target.checked);
+                      if (e.target.checked) {
+                        setApproveData(prev => ({ ...prev, deductible: prev.member_owes }));
+                      }
+                    }}
+                    style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                  All
+                </label>
+              </div>
               <input
                 type="number"
                 step="0.01"
-                value={approveData.deductible}
+                value={deductibleAll ? approveData.member_owes : approveData.deductible}
                 onChange={e => setApproveData({ ...approveData, deductible: e.target.value })}
-                style={inputStyle}
+                readOnly={deductibleAll}
+                style={{ ...inputStyle, background: deductibleAll ? 'var(--bg)' : undefined }}
               />
             </div>
           </div>
