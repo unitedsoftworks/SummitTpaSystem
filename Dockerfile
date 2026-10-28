@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
-COPY nginx.conf /etc/nginx/sites-available/default
+RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/summit.conf
 
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 

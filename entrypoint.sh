@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
+python manage.py collectstatic --noinput 2>/dev/null || true
 python manage.py migrate --noinput
 
+nginx -t
 nginx
 
 exec gunicorn summit_tpa.wsgi:application \
