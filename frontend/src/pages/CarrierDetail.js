@@ -23,7 +23,7 @@ export default function CarrierDetail() {
 
   if (!data) return <div style={{ padding: 40, color: 'var(--text-muted)' }}>Loading...</div>;
 
-  const { carrier, plans, invoices, summary } = data;
+  const { carrier, products, invoices, summary } = data;
   const tc = typeColors[carrier.carrier_type] || typeColors.medical;
 
   return (
@@ -72,7 +72,7 @@ export default function CarrierDetail() {
 
       {/* KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
-        <KpiCard label="Active plans" value={summary.active_plans} color="#3b82f6" />
+        <KpiCard label="Active products" value={summary.active_products} color="#3b82f6" />
         <KpiCard label="Active enrollments" value={summary.active_enrollments} sub={`${summary.total_members} members`} color="#16a34a" />
         <KpiCard label="Monthly premium" value={fmt(summary.total_monthly_premium)} sub={`${summary.employers_served} employers`} color="#7c3aed" />
         <KpiCard label="Claims paid" value={fmt(summary.claims_paid)} sub={`${summary.claims_pending} pending`} color="#ea580c" />
@@ -98,33 +98,33 @@ export default function CarrierDetail() {
 
         {/* Plans */}
         <div style={cardStyle}>
-          <h3 style={cardHeading}>Benefit Plans ({plans.length})</h3>
+          <h3 style={cardHeading}>Benefit Products ({products.length})</h3>
           <div style={{ marginTop: 12 }}>
-            {plans.length === 0 ? (
-              <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>No active plans</div>
-            ) : plans.map(plan => {
-              const ptc = typeColors[plan.plan_type] || typeColors.medical;
+            {products.length === 0 ? (
+              <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>No active products</div>
+            ) : products.map(product => {
+              const ptc = typeColors[product.plan_type] || typeColors.medical;
               return (
-                <div key={plan.id} style={{
+                <div key={product.id} style={{
                   padding: '12px 0', borderBottom: '1px solid var(--border)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{plan.name}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{product.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', gap: 8, marginTop: 2 }}>
-                      <span>{plan.employer_name}</span>
+                      <span>{product.employer_name}</span>
                       <span style={{
                         padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600,
                         background: ptc.bg, color: ptc.color, textTransform: 'capitalize',
                       }}>
-                        {plan.plan_type}
+                        {product.plan_type}
                       </span>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{fmt(plan.monthly_premium)}/mo</div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{(product.tiers || []).length} tiers</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {plan.enrollment_count} enrolled
+                      {product.total_enrolled} enrolled
                     </div>
                   </div>
                 </div>

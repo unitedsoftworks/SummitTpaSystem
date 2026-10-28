@@ -88,9 +88,9 @@ class Employer(models.Model):
         return self.employees.filter(status='active').count()
 
 
-class BenefitPlan(models.Model):
-    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='plans')
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='plans')
+class BenefitProduct(models.Model):
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='products')
+    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=200)
     plan_type = models.CharField(max_length=50, choices=[
         ('medical', 'Medical'),
@@ -98,6 +98,16 @@ class BenefitPlan(models.Model):
         ('vision', 'Vision'),
         ('life', 'Life'),
     ])
+    effective_date = models.DateField()
+    termination_date = models.DateField(null=True, blank=True)
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_plan_type_display()})"
+
+
+class BenefitPlan(models.Model):
+    product = models.ForeignKey(BenefitProduct, on_delete=models.CASCADE, related_name='tiers')
     tier = models.CharField(max_length=50, choices=[
         ('employee_only', 'Employee Only'),
         ('employee_spouse', 'Employee + Spouse'),
@@ -107,12 +117,36 @@ class BenefitPlan(models.Model):
     monthly_premium = models.DecimalField(max_digits=10, decimal_places=2)
     employer_contribution = models.DecimalField(max_digits=10, decimal_places=2)
     employee_deduction = models.DecimalField(max_digits=10, decimal_places=2)
-    effective_date = models.DateField()
-    termination_date = models.DateField(null=True, blank=True)
-    active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ['product', 'tier']
 
     def __str__(self):
-        return f"{self.name} - {self.get_tier_display()}"
+        return f"{self.product.name} - {self.get_tier_display()}"
+
+    @property
+    def name(self):
+        return self.product.name
+
+    @property
+    def plan_type(self):
+        return self.product.plan_type
+
+    @property
+    def carrier(self):
+        return self.product.carrier
+
+    @property
+    def employer(self):
+        return self.product.employer
+
+    @property
+    def effective_date(self):
+        return self.product.effective_date
+
+    @property
+    def active(self):
+        return self.product.active
 
 
 class AbstractPerson(models.Model):
@@ -728,10 +762,10 @@ class EmployerInvoiceLine(models.Model):
     employee_deduction = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
-        ordering = ['employee__last_name', 'employee__first_name', 'plan__plan_type']
+        ordering = ['employee__last_name', 'employee__first_name', 'plan__product__plan_type']
 
     def __str__(self):
-        return f"{self.employee.full_name} - {self.plan.name}"
+        return f"{self.employee.full_name} - {self.plan.product.name}"
 
 
 class Exception(models.Model):

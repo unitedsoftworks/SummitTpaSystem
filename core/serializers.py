@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Association, Broker, Carrier, Employer, BenefitPlan, Employee,
+    Association, Broker, Carrier, Employer, BenefitProduct, BenefitPlan, Employee,
     Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
@@ -42,14 +42,48 @@ class EmployerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class BenefitPlanSerializer(serializers.ModelSerializer):
-    carrier_name = serializers.CharField(source='carrier.name', read_only=True)
-    employer_name = serializers.CharField(source='employer.name', read_only=True)
+class BenefitPlanTierSerializer(serializers.ModelSerializer):
     enrollment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = BenefitPlan
+        fields = ['id', 'tier', 'monthly_premium', 'employer_contribution', 'employee_deduction', 'enrollment_count']
+
+    def get_enrollment_count(self, obj):
+        return obj.enrollments.filter(status__in=['active', 'carrier_confirmed']).count()
+
+
+class BenefitProductSerializer(serializers.ModelSerializer):
+    carrier_name = serializers.CharField(source='carrier.name', read_only=True)
+    employer_name = serializers.CharField(source='employer.name', read_only=True)
+    tiers = BenefitPlanTierSerializer(many=True, read_only=True)
+    total_enrolled = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BenefitProduct
         fields = '__all__'
+
+    def get_total_enrolled(self, obj):
+        return sum(
+            t.enrollments.filter(status__in=['active', 'carrier_confirmed']).count()
+            for t in obj.tiers.all()
+        )
+
+
+class BenefitPlanSerializer(serializers.ModelSerializer):
+    carrier_name = serializers.CharField(source='product.carrier.name', read_only=True)
+    employer_name = serializers.CharField(source='product.employer.name', read_only=True)
+    name = serializers.CharField(source='product.name', read_only=True)
+    plan_type = serializers.CharField(source='product.plan_type', read_only=True)
+    effective_date = serializers.DateField(source='product.effective_date', read_only=True)
+    active = serializers.BooleanField(source='product.active', read_only=True)
+    enrollment_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BenefitPlan
+        fields = ['id', 'product', 'tier', 'monthly_premium', 'employer_contribution',
+                  'employee_deduction', 'carrier_name', 'employer_name', 'name',
+                  'plan_type', 'effective_date', 'active', 'enrollment_count']
 
     def get_enrollment_count(self, obj):
         return obj.enrollments.filter(status__in=['active', 'carrier_confirmed']).count()
@@ -92,9 +126,9 @@ class EnrollmentMemberSerializer(serializers.ModelSerializer):
 class EnrollmentSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     employer_name = serializers.CharField(source='employee.employer.name', read_only=True)
-    plan_name = serializers.CharField(source='plan.name', read_only=True)
-    plan_type = serializers.CharField(source='plan.plan_type', read_only=True)
-    carrier_name = serializers.CharField(source='plan.carrier.name', read_only=True)
+    plan_name = serializers.CharField(source='plan.product.name', read_only=True)
+    plan_type = serializers.CharField(source='plan.product.plan_type', read_only=True)
+    carrier_name = serializers.CharField(source='plan.product.carrier.name', read_only=True)
     employee_deduction = serializers.DecimalField(
         source='plan.employee_deduction', max_digits=10, decimal_places=2, read_only=True
     )
@@ -127,7 +161,7 @@ class ClaimSerializer(serializers.ModelSerializer):
 
 class PayrollDeductionSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
-    plan_name = serializers.CharField(source='enrollment.plan.name', read_only=True)
+    plan_name = serializers.CharField(source='enrollment.plan.product.name', read_only=True)
 
     class Meta:
         model = PayrollDeduction
@@ -189,7 +223,7 @@ class EligibilityRecordSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     employer_name = serializers.CharField(source='employee.employer.name', read_only=True)
     carrier_name = serializers.CharField(source='carrier.name', read_only=True)
-    plan_name = serializers.CharField(source='plan.name', read_only=True)
+    plan_name = serializers.CharField(source='plan.product.name', read_only=True)
     file_type_display = serializers.CharField(source='get_file_type_display', read_only=True)
 
     class Meta:
@@ -238,8 +272,8 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 class EmployerInvoiceLineSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
-    plan_name = serializers.CharField(source='plan.name', read_only=True)
-    plan_type = serializers.CharField(source='plan.plan_type', read_only=True)
+    plan_name = serializers.CharField(source='plan.product.name', read_only=True)
+    plan_type = serializers.CharField(source='plan.product.plan_type', read_only=True)
 
     class Meta:
         model = EmployerInvoiceLine
