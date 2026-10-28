@@ -99,6 +99,46 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
             status=http_status.HTTP_201_CREATED,
         )
 
+    def update(self, request, *args, **kwargs):
+        product = self.get_object()
+        tiers_data = request.data.pop('tiers', None)
+
+        serializer = self.get_serializer(product, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        if tiers_data is not None:
+            existing_tiers = {t.tier: t for t in product.tiers.all()}
+            incoming_tier_keys = set()
+            for td in tiers_data:
+                tier_key = td['tier']
+                incoming_tier_keys.add(tier_key)
+                if tier_key in existing_tiers:
+                    t = existing_tiers[tier_key]
+                    t.monthly_premium = td['monthly_premium']
+                    t.employer_contribution = td['employer_contribution']
+                    t.employee_deduction = td['employee_deduction']
+                    t.save()
+                else:
+                    BenefitPlan.objects.create(product=product, **td)
+            for tier_key, t in existing_tiers.items():
+                if tier_key not in incoming_tier_keys:
+                    if t.enrollments.filter(status__in=['active', 'carrier_confirmed']).exists():
+                        return Response(
+                            {'error': f'Cannot remove {t.get_tier_display()} — has active enrollments'},
+                            status=http_status.HTTP_400_BAD_REQUEST,
+                        )
+                    t.delete()
+
+        product.refresh_from_db()
+        AuditLog.objects.create(
+            action='update_product',
+            entity_type='BenefitProduct',
+            entity_id=product.id,
+            description=f"Updated benefit product {product.name}",
+        )
+        return Response(BenefitProductSerializer(product).data)
+
     @action(detail=True, methods=['post'])
     def add_tier(self, request, pk=None):
         product = self.get_object()
