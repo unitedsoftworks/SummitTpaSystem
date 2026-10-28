@@ -62,7 +62,7 @@ export default function PortalSelect() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0B1120 0%, #0F172A 50%, #0B1120 100%)',
+      background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

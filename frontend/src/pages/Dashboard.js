@@ -6,19 +6,19 @@ import StatusBadge from '../components/StatusBadge';
 const fmt = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
 const actionColors = {
-  carrier_confirm: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Confirm' },
-  activate: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Activate' },
-  terminate: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: 'Terminate' },
-  add_member: { bg: 'rgba(139,92,246,0.15)', color: '#A78BFA', label: 'Add Member' },
-  remove_member: { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: 'Remove' },
-  generate_deductions: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Deductions' },
-  resolve_invoice: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Resolve' },
-  pay_invoice: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Pay' },
-  claim_paid: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Paid' },
-  claim_approved: { bg: 'rgba(5,150,105,0.15)', color: '#34D399', label: 'Approved' },
-  claim_denied: { bg: 'rgba(244,63,94,0.15)', color: '#F43F5E', label: 'Denied' },
-  eligibility_sent: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Eligibility' },
-  eligibility_generated: { bg: 'rgba(13,148,136,0.15)', color: '#2DD4BF', label: 'Eligibility' },
+  carrier_confirm: { bg: '#F0FDFA', color: '#0D9488', label: 'Confirm' },
+  activate: { bg: '#ECFDF5', color: '#047857', label: 'Activate' },
+  terminate: { bg: '#FFF1F2', color: '#E11D48', label: 'Terminate' },
+  add_member: { bg: '#F5F3FF', color: '#7C3AED', label: 'Add Member' },
+  remove_member: { bg: '#FFFBEB', color: '#D97706', label: 'Remove' },
+  generate_deductions: { bg: '#F0FDFA', color: '#0D9488', label: 'Deductions' },
+  resolve_invoice: { bg: '#ECFDF5', color: '#047857', label: 'Resolve' },
+  pay_invoice: { bg: '#ECFDF5', color: '#047857', label: 'Pay' },
+  claim_paid: { bg: '#ECFDF5', color: '#047857', label: 'Paid' },
+  claim_approved: { bg: '#ECFDF5', color: '#047857', label: 'Approved' },
+  claim_denied: { bg: '#FFF1F2', color: '#E11D48', label: 'Denied' },
+  eligibility_sent: { bg: '#F0FDFA', color: '#0D9488', label: 'Eligibility' },
+  eligibility_generated: { bg: '#F0FDFA', color: '#0D9488', label: 'Eligibility' },
 };
 
 export default function Dashboard() {

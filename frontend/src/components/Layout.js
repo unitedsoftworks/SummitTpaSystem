@@ -139,8 +139,8 @@ function Dropdown({ group, color, isActive, portalPrefix }) {
         <div style={{
           position: 'absolute', top: '100%', left: 0,
           background: 'var(--card)', borderRadius: 12,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2)',
-          border: '1px solid var(--border-light)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
+          border: '1px solid var(--border)',
           padding: 6, minWidth: 240, zIndex: 100,
           animation: 'dropIn 0.15s ease-out',
         }}>
@@ -215,7 +215,7 @@ function SearchBar({ portal }) {
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
         style={{
           width: 36, height: 36, borderRadius: 8, border: 'none',
-          background: open ? 'var(--border-light)' : 'transparent',
+          background: open ? 'var(--border)' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.15s',
         }}
@@ -228,11 +228,11 @@ function SearchBar({ portal }) {
         <div style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 4,
           width: 380, background: 'var(--card)', borderRadius: 12,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2)',
-          border: '1px solid var(--border-light)', zIndex: 200,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
+          border: '1px solid var(--border)', zIndex: 200,
           animation: 'dropIn 0.15s ease-out',
         }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
             <input
               ref={inputRef}
               value={query}
@@ -345,7 +345,7 @@ export default function Layout({ portal, children }) {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{
         background: 'var(--nav-bg)',
-        borderBottom: '1px solid var(--border-light)',
+        borderBottom: '1px solid var(--border)',
         position: 'sticky', top: 0, zIndex: 50,
       }}>
         <div style={{
@@ -411,7 +411,7 @@ export default function Layout({ portal, children }) {
             <button
               onClick={() => navigate('/')}
               style={{
-                background: 'none', border: '1px solid var(--border-light)',
+                background: 'none', border: '1px solid var(--border)',
                 padding: '7px 14px', borderRadius: 8, fontSize: 13,
                 fontWeight: 500, color: 'var(--text-secondary)',
                 display: 'flex', alignItems: 'center', gap: 6,
