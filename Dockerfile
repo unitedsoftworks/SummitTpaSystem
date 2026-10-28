@@ -8,24 +8,17 @@ RUN npm run build
 FROM python:3.13-slim
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
-RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/summit.conf
-
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 
 RUN mkdir -p /app/media
 
-EXPOSE 80
+EXPOSE 3000
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
