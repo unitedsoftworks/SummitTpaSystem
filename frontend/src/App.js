@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ConfirmProvider } from './components/ConfirmDialog';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -47,6 +48,7 @@ function P({ children }) {
 
 export default function App() {
   return (
+    <ConfirmProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -103,5 +105,6 @@ export default function App() {
         <Route path="/association" element={<P><Layout portal="staff"><AssociationPortal /></Layout></P>} />
       </Routes>
     </BrowserRouter>
+    </ConfirmProvider>
   );
 }

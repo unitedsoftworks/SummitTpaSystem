@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const typeColors = {
   medical: { bg: '#dbeafe', color: '#1d4ed8', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
@@ -79,6 +80,7 @@ export default function Plans() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [expandedTiers, setExpandedTiers] = useState({});
+  const confirm = useConfirm();
 
   useEffect(() => {
     api.get('/employers/').then(r => setEmployers(r.data));
@@ -120,6 +122,19 @@ export default function Plans() {
   };
 
   const closeModal = () => { setShowModal(false); setEditProduct(null); setError(''); };
+
+  const pushRates = async (product) => {
+    const enrolled = product.total_enrolled || 0;
+    const ok = await confirm({
+      title: 'Push Rates to Enrollments',
+      message: `This will update all ${enrolled} active enrollment${enrolled !== 1 ? 's' : ''} on "${product.name}" to match the current plan rates. Enrollment-level rate overrides will be replaced.`,
+      confirmLabel: `Update ${enrolled} Enrollment${enrolled !== 1 ? 's' : ''}`,
+      variant: 'warning',
+    });
+    if (!ok) return;
+    await api.post(`/products/${product.id}/push_rates/`);
+    loadProducts();
+  };
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -348,20 +363,38 @@ export default function Plans() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{product.total_enrolled} enrolled</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{(product.tiers || []).length} tier{(product.tiers || []).length !== 1 ? 's' : ''}</div>
                 </div>
-                <button
-                  onClick={() => openEdit(product)}
-                  style={{
-                    background: 'none', border: '1px solid var(--border)', borderRadius: 8,
-                    padding: '6px 14px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  Edit
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {product.total_enrolled > 0 && (
+                    <button
+                      onClick={() => pushRates(product)}
+                      style={{
+                        background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+                        padding: '6px 14px', fontSize: 12, fontWeight: 600, color: 'var(--accent)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      }}
+                      title="Push current rates to all active enrollments"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14m0-14l-4 4m4-4l4 4" />
+                      </svg>
+                      Push Rates
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openEdit(product)}
+                    style={{
+                      background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '6px 14px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Edit
+                  </button>
+                </div>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>

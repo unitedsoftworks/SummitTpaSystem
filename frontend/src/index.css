@@ -63,6 +63,8 @@ button:active { transform: scale(0.97); }
 .btn-success:hover { background: #047857; }
 .btn-danger { background: var(--red); color: #fff; }
 .btn-danger:hover { background: #E11D48; }
+.btn-warning { background: #d97706; color: #fff; }
+.btn-warning:hover { background: #b45309; }
 .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-outline:hover { background: var(--table-row-hover); }
 .btn-outline.active { background: var(--accent); color: #fff; border-color: var(--accent); }

@@ -185,6 +185,25 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
         return Response(BenefitProductSerializer(product).data)
 
     @action(detail=True, methods=['post'])
+    def push_rates(self, request, pk=None):
+        product = self.get_object()
+        statuses = request.data.get('statuses', ['active', 'carrier_confirmed', 'pending'])
+        enrollments = Enrollment.objects.filter(
+            plan__product=product,
+            status__in=statuses,
+        )
+        count = enrollments.count()
+        for enrollment in enrollments:
+            enrollment.snapshot_rates()
+        AuditLog.objects.create(
+            action='push_rates',
+            entity_type='BenefitProduct',
+            entity_id=product.id,
+            description=f"Pushed current rates to {count} enrollments on {product.name}",
+        )
+        return Response({'updated': count, 'product': product.name})
+
+    @action(detail=True, methods=['post'])
     def add_tier(self, request, pk=None):
         product = self.get_object()
         tier = request.data.get('tier')

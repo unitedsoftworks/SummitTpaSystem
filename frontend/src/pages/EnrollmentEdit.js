@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const planColors = {
   medical: '#3b82f6',
@@ -25,6 +26,7 @@ export default function EnrollmentEdit() {
   const [saving, setSaving] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
   const [rateForm, setRateForm] = useState({ employer_contribution: '', allocations: [] });
+  const confirm = useConfirm();
 
   const load = () => {
     api.get(`/enrollments/${id}/`).then(r => {
@@ -60,6 +62,15 @@ export default function EnrollmentEdit() {
   };
 
   const handleAction = async (action) => {
+    if (action === 'terminate') {
+      const ok = await confirm({
+        title: 'Terminate Enrollment',
+        message: `This will terminate ${enrollment?.employee_name}'s enrollment in ${enrollment?.plan_name}. This can be reversed by reactivating.`,
+        confirmLabel: 'Terminate',
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     await api.post(`/enrollments/${id}/${action}/`);
     load();
@@ -67,6 +78,13 @@ export default function EnrollmentEdit() {
   };
 
   const handleResnapshot = async () => {
+    const ok = await confirm({
+      title: 'Re-sync Rates from Plan',
+      message: 'This will replace the enrollment\'s current rates and vendor allocations with the latest rates from the plan. Any manual rate adjustments will be lost.',
+      confirmLabel: 'Re-sync Rates',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     await api.post(`/enrollments/${id}/resnapshot/`);
     load();
