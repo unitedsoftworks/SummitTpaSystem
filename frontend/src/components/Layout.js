@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import { logout, getUser } from '../api/auth';
 
 const portalConfigs = {
   staff: {
@@ -422,6 +423,23 @@ export default function Layout({ portal, children }) {
                 <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4" />
               </svg>
               Switch
+            </button>
+            <button
+              onClick={async () => { await logout(); navigate('/login'); }}
+              style={{
+                background: 'none', border: '1px solid var(--border)',
+                padding: '7px 14px', borderRadius: 8, fontSize: 13,
+                fontWeight: 500, color: '#dc2626',
+                display: 'flex', alignItems: 'center', gap: 6,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Sign Out
             </button>
           </div>
         </div>

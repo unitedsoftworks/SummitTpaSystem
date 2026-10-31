@@ -87,17 +87,60 @@ class Employer(models.Model):
     def active_employee_count(self):
         return self.employees.filter(status='active').count()
 
+    @property
+    def all_brokers(self):
+        return Broker.objects.filter(
+            product_assignments__employer=self
+        ).distinct()
+
+
+class Location(models.Model):
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='locations')
+    name = models.CharField(max_length=200)
+    address_line_1 = models.CharField(max_length=200)
+    address_line_2 = models.CharField(max_length=200, blank=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=2)
+    zip_code = models.CharField(max_length=10)
+    is_primary = models.BooleanField(default=False)
+    employee_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_primary', 'name']
+
+    def __str__(self):
+        return f"{self.name} - {self.city}, {self.state}"
+
 
 class BenefitProduct(models.Model):
+    PAYMENT_ARRANGEMENT_CHOICES = [
+        ('consolidated', 'Consolidated Billing'),
+        ('direct_to_vendor', 'Direct to Vendor'),
+    ]
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='products')
     carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='products')
+    plan_type_ref = models.ForeignKey(
+        'benefits.PlanType', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='products',
+    )
+    brokers = models.ManyToManyField(Broker, blank=True, related_name='product_assignments')
     name = models.CharField(max_length=200)
     plan_type = models.CharField(max_length=50, choices=[
         ('medical', 'Medical'),
         ('dental', 'Dental'),
         ('vision', 'Vision'),
         ('life', 'Life'),
+        ('accident', 'Accident'),
+        ('disability_short', 'Short-Term Disability'),
+        ('disability_long', 'Long-Term Disability'),
+        ('telehealth', 'Telehealth'),
+        ('critical_illness', 'Critical Illness'),
+        ('hospital_indemnity', 'Hospital Indemnity'),
     ])
+    payment_arrangement = models.CharField(
+        max_length=20, choices=PAYMENT_ARRANGEMENT_CHOICES, default='consolidated',
+    )
     effective_date = models.DateField()
     termination_date = models.DateField(null=True, blank=True)
     active = models.BooleanField(default=True)
@@ -384,6 +427,10 @@ class CarrierInvoice(models.Model):
 
 class Payment(models.Model):
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='payments')
+    invoice = models.ForeignKey(
+        'EmployerInvoice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='payments',
+    )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()
     payment_method = models.CharField(max_length=20, choices=[
@@ -844,8 +891,9 @@ class ExceptionNote(models.Model):
 class AuditLog(models.Model):
     action = models.CharField(max_length=50)
     entity_type = models.CharField(max_length=50)
-    entity_id = models.IntegerField()
-    description = models.TextField()
+    entity_id = models.IntegerField(null=True, blank=True)
+    description = models.TextField(blank=True)
+    details = models.TextField(blank=True)
     performed_by = models.CharField(max_length=200, default='System')
     created_at = models.DateTimeField(auto_now_add=True)
 

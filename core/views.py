@@ -3,12 +3,13 @@ import builtins
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from rest_framework import viewsets, status as http_status
-from rest_framework.decorators import api_view, action
+from rest_framework.decorators import api_view, action, permission_classes as perm_classes_decorator
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
+from accounts.permissions import IsAdmin, IsStaffOrAbove, IsAssociationOrAbove, IsBrokerOrAbove, IsEmployerOrAbove
 from .models import (
-    Association, Broker, Carrier, Employer, BenefitProduct, BenefitPlan, Employee,
+    Association, Broker, Carrier, Employer, Location, BenefitProduct, BenefitPlan, Employee,
     Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
@@ -16,7 +17,8 @@ from .models import (
 )
 from .serializers import (
     AssociationSerializer, BrokerSerializer,
-    CarrierSerializer, EmployerSerializer, BenefitProductSerializer,
+    CarrierSerializer, EmployerSerializer, LocationSerializer,
+    BenefitProductSerializer,
     BenefitPlanSerializer, BenefitPlanTierSerializer,
     EmployeeSerializer, DependentSerializer, EnrollmentSerializer,
     EnrollmentMemberSerializer, ClaimSerializer, PayrollDeductionSerializer,
@@ -31,24 +33,45 @@ from .serializers import (
 class AssociationViewSet(viewsets.ModelViewSet):
     queryset = Association.objects.all()
     serializer_class = AssociationSerializer
+    permission_classes = [IsStaffOrAbove]
 
 
 class BrokerViewSet(viewsets.ModelViewSet):
     queryset = Broker.objects.all()
     serializer_class = BrokerSerializer
+    permission_classes = [IsStaffOrAbove]
 
 
 class CarrierViewSet(viewsets.ModelViewSet):
     queryset = Carrier.objects.all()
     serializer_class = CarrierSerializer
+    permission_classes = [IsStaffOrAbove]
+
+
+class LocationViewSet(viewsets.ModelViewSet):
+    queryset = Location.objects.select_related('employer').all()
+    serializer_class = LocationSerializer
+    permission_classes = [IsEmployerOrAbove]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
+        employer_id = self.request.query_params.get('employer')
+        if employer_id:
+            qs = qs.filter(employer_id=employer_id)
+        return qs
 
 
 class EmployerViewSet(viewsets.ModelViewSet):
     queryset = Employer.objects.select_related('association', 'broker').all()
     serializer_class = EmployerSerializer
+    permission_classes = [IsAssociationOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset().prefetch_related('employees')
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(pk__in=self.request.tenant_employers)
         assoc = self.request.query_params.get('association')
         if assoc:
             qs = qs.filter(association_id=assoc)
@@ -66,11 +89,14 @@ class EmployerViewSet(viewsets.ModelViewSet):
 
 
 class BenefitProductViewSet(viewsets.ModelViewSet):
-    queryset = BenefitProduct.objects.select_related('carrier', 'employer').prefetch_related('tiers').all()
+    queryset = BenefitProduct.objects.select_related('carrier', 'employer').prefetch_related('tiers', 'brokers').all()
     serializer_class = BenefitProductSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(employer_id=employer_id)
@@ -158,9 +184,12 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
 class BenefitPlanViewSet(viewsets.ModelViewSet):
     queryset = BenefitPlan.objects.select_related('product', 'product__carrier', 'product__employer').all()
     serializer_class = BenefitPlanSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(product__employer__in=self.request.tenant_employers)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(product__employer_id=employer_id)
@@ -170,9 +199,12 @@ class BenefitPlanViewSet(viewsets.ModelViewSet):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.select_related('employer').all()
     serializer_class = EmployeeSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(employer_id=employer_id)
@@ -192,9 +224,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 class DependentViewSet(viewsets.ModelViewSet):
     queryset = Dependent.objects.select_related('employee', 'employee__employer').all()
     serializer_class = DependentSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employee__employer__in=self.request.tenant_employers)
         employee_id = self.request.query_params.get('employee')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
@@ -209,9 +244,12 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         'employee', 'employee__employer', 'plan', 'plan__product', 'plan__product__carrier'
     ).prefetch_related('members', 'members__dependent').all()
     serializer_class = EnrollmentSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employee__employer__in=self.request.tenant_employers)
         employee_id = self.request.query_params.get('employee')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
@@ -327,9 +365,12 @@ class EnrollmentMemberViewSet(viewsets.ModelViewSet):
         'enrollment', 'enrollment__employee', 'dependent'
     ).all()
     serializer_class = EnrollmentMemberSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(enrollment__employee__employer__in=self.request.tenant_employers)
         enrollment_id = self.request.query_params.get('enrollment')
         if enrollment_id:
             qs = qs.filter(enrollment_id=enrollment_id)
@@ -341,9 +382,12 @@ class ClaimViewSet(viewsets.ModelViewSet):
         'employee', 'employee__employer', 'dependent', 'enrollment__plan', 'enrollment__plan__product'
     ).all()
     serializer_class = ClaimSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employee__employer__in=self.request.tenant_employers)
         s = self.request.query_params.get('status')
         if s:
             qs = qs.filter(status=s)
@@ -422,9 +466,12 @@ class PayrollDeductionViewSet(viewsets.ModelViewSet):
         'enrollment__employee', 'enrollment__plan'
     ).all()
     serializer_class = PayrollDeductionSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(enrollment__employee__employer__in=self.request.tenant_employers)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(enrollment__employee__employer_id=employer_id)
@@ -482,9 +529,12 @@ class PayrollDeductionViewSet(viewsets.ModelViewSet):
 class CarrierInvoiceViewSet(viewsets.ModelViewSet):
     queryset = CarrierInvoice.objects.select_related('carrier', 'employer').all()
     serializer_class = CarrierInvoiceSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
         s = self.request.query_params.get('status')
         if s:
             qs = qs.filter(status=s)
@@ -522,11 +572,14 @@ class CarrierInvoiceViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    queryset = Payment.objects.select_related('employer').all()
+    queryset = Payment.objects.select_related('employer', 'invoice').all()
     serializer_class = PaymentSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(employer_id=employer_id)
@@ -539,6 +592,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.select_related('employee', 'employee__employer').all()
     serializer_class = MessageSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -560,6 +614,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 class LifeEventViewSet(viewsets.ModelViewSet):
     queryset = LifeEvent.objects.select_related('employee', 'employee__employer').all()
     serializer_class = LifeEventSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -581,6 +636,7 @@ class LifeEventViewSet(viewsets.ModelViewSet):
 class ReimbursementViewSet(viewsets.ModelViewSet):
     queryset = Reimbursement.objects.select_related('employee', 'employee__employer').all()
     serializer_class = ReimbursementSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -604,6 +660,7 @@ class EligibilityRecordViewSet(viewsets.ModelViewSet):
         'employee', 'employee__employer', 'carrier', 'plan', 'plan__product'
     ).all()
     serializer_class = EligibilityRecordSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -628,6 +685,7 @@ class EligibilityRecordViewSet(viewsets.ModelViewSet):
 class CobraEventViewSet(viewsets.ModelViewSet):
     queryset = CobraEvent.objects.select_related('employee', 'employer').all()
     serializer_class = CobraEventSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -649,6 +707,7 @@ class CobraEventViewSet(viewsets.ModelViewSet):
 class OpenEnrollmentPeriodViewSet(viewsets.ModelViewSet):
     queryset = OpenEnrollmentPeriod.objects.select_related('employer').all()
     serializer_class = OpenEnrollmentPeriodSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -664,6 +723,7 @@ class OpenEnrollmentPeriodViewSet(viewsets.ModelViewSet):
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.select_related('employer', 'carrier', 'employee').all()
     serializer_class = DocumentSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -688,6 +748,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
+    permission_classes = [IsEmployerOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -720,9 +781,12 @@ class EmployerInvoiceViewSet(viewsets.ModelViewSet):
         'lines__employee', 'lines__plan', 'lines__plan__product', 'lines__plan__product__carrier'
     ).all()
     serializer_class = EmployerInvoiceSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if hasattr(self.request, 'tenant_employers'):
+            qs = qs.filter(employer__in=self.request.tenant_employers)
         employer = self.request.query_params.get('employer')
         if employer:
             qs = qs.filter(employer_id=employer)
@@ -735,6 +799,7 @@ class EmployerInvoiceViewSet(viewsets.ModelViewSet):
 class ExceptionViewSet(viewsets.ModelViewSet):
     queryset = Exception.objects.select_related('employer', 'employee', 'carrier').prefetch_related('notes').all()
     serializer_class = ExceptionSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -756,6 +821,7 @@ class ExceptionViewSet(viewsets.ModelViewSet):
 class ExceptionNoteViewSet(viewsets.ModelViewSet):
     queryset = ExceptionNote.objects.all()
     serializer_class = ExceptionNoteSerializer
+    permission_classes = [IsStaffOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
@@ -776,6 +842,7 @@ class ExceptionNoteViewSet(viewsets.ModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
+    permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()

@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
 import PortalSelect from './pages/PortalSelect';
 import Dashboard from './pages/Dashboard';
 import Employers from './pages/Employers';
@@ -39,61 +41,66 @@ import EmployerInvoices from './pages/EmployerInvoices';
 import Exceptions from './pages/Exceptions';
 import NewEnrollment from './pages/NewEnrollment';
 
+function P({ children }) {
+  return <ProtectedRoute>{children}</ProtectedRoute>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PortalSelect />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<P><PortalSelect /></P>} />
 
         {/* Staff Portal */}
-        <Route path="/staff" element={<Layout portal="staff"><Dashboard /></Layout>} />
-        <Route path="/staff/employers" element={<Layout portal="staff"><Employers /></Layout>} />
-        <Route path="/staff/employers/:id" element={<Layout portal="staff"><EmployerDetail /></Layout>} />
-        <Route path="/staff/employees" element={<Layout portal="staff"><Employees /></Layout>} />
-        <Route path="/staff/employees/:id" element={<Layout portal="staff"><EmployeeDetail /></Layout>} />
-        <Route path="/staff/employees/:id/new-coverage" element={<Layout portal="staff"><NewEnrollment /></Layout>} />
-        <Route path="/staff/enrollments" element={<Layout portal="staff"><Enrollments /></Layout>} />
-        <Route path="/staff/enrollments/:id" element={<Layout portal="staff"><EnrollmentEdit /></Layout>} />
-        <Route path="/staff/claims" element={<Layout portal="staff"><Claims /></Layout>} />
-        <Route path="/staff/claims/:id" element={<Layout portal="staff"><ClaimDetail /></Layout>} />
-        <Route path="/staff/messages" element={<Layout portal="staff"><Messages /></Layout>} />
-        <Route path="/staff/life-events" element={<Layout portal="staff"><LifeEvents /></Layout>} />
-        <Route path="/staff/reimbursements" element={<Layout portal="staff"><Reimbursements /></Layout>} />
-        <Route path="/staff/finance" element={<Layout portal="staff"><Finance /></Layout>} />
-        <Route path="/staff/reports" element={<Layout portal="staff"><Reports /></Layout>} />
-        <Route path="/staff/deductions" element={<Layout portal="staff"><Deductions /></Layout>} />
-        <Route path="/staff/invoices" element={<Layout portal="staff"><Invoices /></Layout>} />
-        <Route path="/staff/eligibility" element={<Layout portal="staff"><Eligibility /></Layout>} />
-        <Route path="/staff/cobra" element={<Layout portal="staff"><CobraAdmin /></Layout>} />
-        <Route path="/staff/open-enrollment" element={<Layout portal="staff"><OpenEnrollment /></Layout>} />
-        <Route path="/staff/documents" element={<Layout portal="staff"><Documents /></Layout>} />
-        <Route path="/staff/notifications" element={<Layout portal="staff"><Notifications /></Layout>} />
-        <Route path="/staff/carriers" element={<Layout portal="staff"><Carriers /></Layout>} />
-        <Route path="/staff/carriers/:id" element={<Layout portal="staff"><CarrierDetail /></Layout>} />
-        <Route path="/staff/compliance" element={<Layout portal="staff"><Compliance /></Layout>} />
-        <Route path="/staff/plans" element={<Layout portal="staff"><Plans /></Layout>} />
-        <Route path="/staff/payments" element={<Layout portal="staff"><Payments /></Layout>} />
-        <Route path="/staff/dependents" element={<Layout portal="staff"><Dependents /></Layout>} />
-        <Route path="/staff/associations" element={<Layout portal="staff"><Associations /></Layout>} />
-        <Route path="/staff/employer-invoices" element={<Layout portal="staff"><EmployerInvoices /></Layout>} />
-        <Route path="/staff/exceptions" element={<Layout portal="staff"><Exceptions /></Layout>} />
-        <Route path="/staff/audit-log" element={<Layout portal="staff"><AuditLog /></Layout>} />
+        <Route path="/staff" element={<P><Layout portal="staff"><Dashboard /></Layout></P>} />
+        <Route path="/staff/employers" element={<P><Layout portal="staff"><Employers /></Layout></P>} />
+        <Route path="/staff/employers/:id" element={<P><Layout portal="staff"><EmployerDetail /></Layout></P>} />
+        <Route path="/staff/employees" element={<P><Layout portal="staff"><Employees /></Layout></P>} />
+        <Route path="/staff/employees/:id" element={<P><Layout portal="staff"><EmployeeDetail /></Layout></P>} />
+        <Route path="/staff/employees/:id/new-coverage" element={<P><Layout portal="staff"><NewEnrollment /></Layout></P>} />
+        <Route path="/staff/enrollments" element={<P><Layout portal="staff"><Enrollments /></Layout></P>} />
+        <Route path="/staff/enrollments/:id" element={<P><Layout portal="staff"><EnrollmentEdit /></Layout></P>} />
+        <Route path="/staff/claims" element={<P><Layout portal="staff"><Claims /></Layout></P>} />
+        <Route path="/staff/claims/:id" element={<P><Layout portal="staff"><ClaimDetail /></Layout></P>} />
+        <Route path="/staff/messages" element={<P><Layout portal="staff"><Messages /></Layout></P>} />
+        <Route path="/staff/life-events" element={<P><Layout portal="staff"><LifeEvents /></Layout></P>} />
+        <Route path="/staff/reimbursements" element={<P><Layout portal="staff"><Reimbursements /></Layout></P>} />
+        <Route path="/staff/finance" element={<P><Layout portal="staff"><Finance /></Layout></P>} />
+        <Route path="/staff/reports" element={<P><Layout portal="staff"><Reports /></Layout></P>} />
+        <Route path="/staff/deductions" element={<P><Layout portal="staff"><Deductions /></Layout></P>} />
+        <Route path="/staff/invoices" element={<P><Layout portal="staff"><Invoices /></Layout></P>} />
+        <Route path="/staff/eligibility" element={<P><Layout portal="staff"><Eligibility /></Layout></P>} />
+        <Route path="/staff/cobra" element={<P><Layout portal="staff"><CobraAdmin /></Layout></P>} />
+        <Route path="/staff/open-enrollment" element={<P><Layout portal="staff"><OpenEnrollment /></Layout></P>} />
+        <Route path="/staff/documents" element={<P><Layout portal="staff"><Documents /></Layout></P>} />
+        <Route path="/staff/notifications" element={<P><Layout portal="staff"><Notifications /></Layout></P>} />
+        <Route path="/staff/carriers" element={<P><Layout portal="staff"><Carriers /></Layout></P>} />
+        <Route path="/staff/carriers/:id" element={<P><Layout portal="staff"><CarrierDetail /></Layout></P>} />
+        <Route path="/staff/compliance" element={<P><Layout portal="staff"><Compliance /></Layout></P>} />
+        <Route path="/staff/plans" element={<P><Layout portal="staff"><Plans /></Layout></P>} />
+        <Route path="/staff/payments" element={<P><Layout portal="staff"><Payments /></Layout></P>} />
+        <Route path="/staff/dependents" element={<P><Layout portal="staff"><Dependents /></Layout></P>} />
+        <Route path="/staff/associations" element={<P><Layout portal="staff"><Associations /></Layout></P>} />
+        <Route path="/staff/employer-invoices" element={<P><Layout portal="staff"><EmployerInvoices /></Layout></P>} />
+        <Route path="/staff/exceptions" element={<P><Layout portal="staff"><Exceptions /></Layout></P>} />
+        <Route path="/staff/audit-log" element={<P><Layout portal="staff"><AuditLog /></Layout></P>} />
 
         {/* Employer Portal */}
-        <Route path="/employer" element={<Layout portal="employer"><EmployerPortal /></Layout>} />
-        <Route path="/employer/employees" element={<Layout portal="employer"><EmployerPortal section="employees" /></Layout>} />
-        <Route path="/employer/enrollments" element={<Layout portal="employer"><EmployerPortal section="enrollments" /></Layout>} />
-        <Route path="/employer/invoices" element={<Layout portal="employer"><EmployerPortal section="invoices" /></Layout>} />
-        <Route path="/employer/deductions" element={<Layout portal="employer"><EmployerPortal section="deductions" /></Layout>} />
+        <Route path="/employer" element={<P><Layout portal="employer"><EmployerPortal /></Layout></P>} />
+        <Route path="/employer/employees" element={<P><Layout portal="employer"><EmployerPortal section="employees" /></Layout></P>} />
+        <Route path="/employer/enrollments" element={<P><Layout portal="employer"><EmployerPortal section="enrollments" /></Layout></P>} />
+        <Route path="/employer/invoices" element={<P><Layout portal="employer"><EmployerPortal section="invoices" /></Layout></P>} />
+        <Route path="/employer/deductions" element={<P><Layout portal="employer"><EmployerPortal section="deductions" /></Layout></P>} />
 
         {/* Employee Portal */}
-        <Route path="/employee" element={<Layout portal="employee"><EmployeePortal /></Layout>} />
+        <Route path="/employee" element={<P><Layout portal="employee"><EmployeePortal /></Layout></P>} />
 
         {/* Broker Portal */}
-        <Route path="/broker" element={<Layout portal="broker"><BrokerPortal /></Layout>} />
+        <Route path="/broker" element={<P><Layout portal="broker"><BrokerPortal /></Layout></P>} />
 
         {/* Association Portal */}
-        <Route path="/association" element={<Layout portal="staff"><AssociationPortal /></Layout>} />
+        <Route path="/association" element={<P><Layout portal="staff"><AssociationPortal /></Layout></P>} />
       </Routes>
     </BrowserRouter>
   );

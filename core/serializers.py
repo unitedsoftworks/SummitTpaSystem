@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Association, Broker, Carrier, Employer, BenefitProduct, BenefitPlan, Employee,
+    Association, Broker, Carrier, Employer, Location, BenefitProduct, BenefitPlan, Employee,
     Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
@@ -31,11 +31,21 @@ class CarrierSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class LocationSerializer(serializers.ModelSerializer):
+    employer_name = serializers.CharField(source='employer.name', read_only=True)
+
+    class Meta:
+        model = Location
+        fields = '__all__'
+
+
 class EmployerSerializer(serializers.ModelSerializer):
     employee_count = serializers.IntegerField(read_only=True)
     active_employee_count = serializers.IntegerField(read_only=True)
     association_name = serializers.CharField(source='association.name', read_only=True, default=None)
     broker_name = serializers.CharField(source='broker.name', read_only=True, default=None)
+    all_brokers = BrokerSerializer(many=True, read_only=True)
+    locations = LocationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Employer
@@ -57,6 +67,11 @@ class BenefitProductSerializer(serializers.ModelSerializer):
     carrier_name = serializers.CharField(source='carrier.name', read_only=True)
     employer_name = serializers.CharField(source='employer.name', read_only=True)
     tiers = BenefitPlanTierSerializer(many=True, read_only=True)
+    broker_ids = serializers.PrimaryKeyRelatedField(
+        source='brokers', queryset=Broker.objects.all(), many=True, required=False,
+    )
+    broker_names = serializers.SerializerMethodField()
+    payment_arrangement_display = serializers.CharField(source='get_payment_arrangement_display', read_only=True)
     total_enrolled = serializers.SerializerMethodField()
 
     class Meta:
@@ -68,6 +83,9 @@ class BenefitProductSerializer(serializers.ModelSerializer):
             t.enrollments.filter(status__in=['active', 'carrier_confirmed']).count()
             for t in obj.tiers.all()
         )
+
+    def get_broker_names(self, obj):
+        return [b.name for b in obj.brokers.all()]
 
 
 class BenefitPlanSerializer(serializers.ModelSerializer):
@@ -182,6 +200,7 @@ class CarrierInvoiceSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     employer_name = serializers.CharField(source='employer.name', read_only=True)
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True, default=None)
 
     class Meta:
         model = Payment
