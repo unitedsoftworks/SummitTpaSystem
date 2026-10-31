@@ -12,7 +12,7 @@ import EmployeeDetail from './pages/EmployeeDetail';
 import Enrollments from './pages/Enrollments';
 import Deductions from './pages/Deductions';
 import Invoices from './pages/Invoices';
-import Carriers from './pages/Carriers';
+import Vendors from './pages/Vendors';
 import AuditLog from './pages/AuditLog';
 import EmployerPortal from './pages/EmployerPortal';
 import EmployeePortal from './pages/EmployeePortal';
@@ -25,7 +25,7 @@ import LifeEvents from './pages/LifeEvents';
 import Reimbursements from './pages/Reimbursements';
 import Finance from './pages/Finance';
 import Reports from './pages/Reports';
-import CarrierDetail from './pages/CarrierDetail';
+import VendorDetail from './pages/VendorDetail';
 import Eligibility from './pages/Eligibility';
 import CobraAdmin from './pages/CobraAdmin';
 import OpenEnrollment from './pages/OpenEnrollment';
@@ -75,8 +75,8 @@ export default function App() {
         <Route path="/staff/open-enrollment" element={<P><Layout portal="staff"><OpenEnrollment /></Layout></P>} />
         <Route path="/staff/documents" element={<P><Layout portal="staff"><Documents /></Layout></P>} />
         <Route path="/staff/notifications" element={<P><Layout portal="staff"><Notifications /></Layout></P>} />
-        <Route path="/staff/carriers" element={<P><Layout portal="staff"><Carriers /></Layout></P>} />
-        <Route path="/staff/carriers/:id" element={<P><Layout portal="staff"><CarrierDetail /></Layout></P>} />
+        <Route path="/staff/vendors" element={<P><Layout portal="staff"><Vendors /></Layout></P>} />
+        <Route path="/staff/vendors/:id" element={<P><Layout portal="staff"><VendorDetail /></Layout></P>} />
         <Route path="/staff/compliance" element={<P><Layout portal="staff"><Compliance /></Layout></P>} />
         <Route path="/staff/plans" element={<P><Layout portal="staff"><Plans /></Layout></P>} />
         <Route path="/staff/payments" element={<P><Layout portal="staff"><Payments /></Layout></P>} />

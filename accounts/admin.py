@@ -9,5 +9,5 @@ class UserAdmin(BaseUserAdmin):
     list_display = ['username', 'email', 'role', 'is_staff', 'is_active']
     list_filter = ['role', 'is_staff', 'is_active', 'require_mfa']
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('SummitTPA', {'fields': ('role', 'association', 'employer', 'employee', 'broker', 'require_mfa', 'mfa_verified')}),
+        ('SummitTPA', {'fields': ('role', 'association', 'employer', 'employee', 'vendor', 'require_mfa', 'mfa_verified')}),
     )

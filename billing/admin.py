@@ -33,4 +33,4 @@ class PaymentBatchAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentBatchItem)
 class PaymentBatchItemAdmin(admin.ModelAdmin):
-    list_display = ['batch', 'payee_type', 'amount']
+    list_display = ['batch', 'vendor', 'amount']

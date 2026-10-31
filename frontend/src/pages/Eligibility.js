@@ -22,7 +22,7 @@ export default function Eligibility() {
   const [carrierFilter, setCarrierFilter] = useState('');
 
   useEffect(() => {
-    api.get('/carriers/').then(r => setCarriers(r.data));
+    api.get('/vendors/?vendor_type=carrier').then(r => setCarriers(r.data));
   }, []);
 
   useEffect(() => {

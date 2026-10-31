@@ -25,7 +25,7 @@ const portalConfigs = {
           { path: '/staff/enrollments', label: 'Enrollments', desc: 'Plan enrollment management' },
           { path: '/staff/open-enrollment', label: 'Open Enrollment', desc: 'Annual enrollment periods' },
           { path: '/staff/cobra', label: 'COBRA', desc: 'Continuation coverage admin' },
-          { path: '/staff/carriers', label: 'Carriers', desc: 'Insurance carrier management' },
+          { path: '/staff/vendors', label: 'Vendors', desc: 'Carriers, brokers & service providers' },
           { path: '/staff/plans', label: 'Plan Management', desc: 'Rates, tiers & plan config' },
         ],
       },

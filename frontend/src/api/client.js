@@ -35,6 +35,18 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    if (process.env.NODE_ENV === 'development' && error.response?.data) {
+      const d = error.response.data;
+      const msg = d.error || d.detail || JSON.stringify(d);
+      const type = d.exception_type || '';
+      const url = original?.url || '';
+      console.error(
+        `[API ${error.response.status}] ${url}\n${type}: ${msg}`,
+        d.traceback ? '\n' + d.traceback.join('') : ''
+      );
+    }
+
     return Promise.reject(error);
   }
 );

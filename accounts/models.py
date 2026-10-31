@@ -24,8 +24,8 @@ class User(AbstractUser):
         'core.Employee', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='user_account',
     )
-    broker = models.ForeignKey(
-        'core.Broker', on_delete=models.SET_NULL, null=True, blank=True,
+    vendor = models.ForeignKey(
+        'core.Vendor', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='users',
     )
     require_mfa = models.BooleanField(default=False)
@@ -52,11 +52,11 @@ class User(AbstractUser):
         if self.role == 'association' and self.association:
             from core.models import Employer
             return Employer.objects.filter(association=self.association)
-        if self.role == 'broker' and self.broker:
-            from core.models import BenefitProduct
-            employer_ids = BenefitProduct.objects.filter(
-                brokers=self.broker
-            ).values_list('employer_id', flat=True).distinct()
+        if self.role == 'broker' and self.vendor:
+            from core.models import Employer, PremiumAllocation
+            employer_ids = PremiumAllocation.objects.filter(
+                vendor=self.vendor
+            ).values_list('plan__product__employer_id', flat=True).distinct()
             from core.models import Employer
             return Employer.objects.filter(id__in=employer_ids)
         if self.role == 'employer' and self.employer:

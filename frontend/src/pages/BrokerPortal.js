@@ -15,7 +15,7 @@ export default function BrokerPortal() {
   const [activeTab, setActiveTab] = useState('book');
 
   useEffect(() => {
-    api.get('/brokers/').then(r => {
+    api.get('/vendors/?vendor_type=broker').then(r => {
       setBrokers(r.data);
       if (r.data.length > 0) setSelectedId(String(r.data[0].id));
     });
@@ -29,6 +29,7 @@ export default function BrokerPortal() {
 
   if (!data) return <div style={{ padding: 40, color: 'var(--text-muted)' }}>Loading...</div>;
 
+  const broker = data.vendor || data.broker || {};
   const totalPremium = data.employers.reduce((s, emp) => s + Number(emp.monthly_premium || 0), 0);
   const totalEmployees = data.employers.reduce((s, emp) => s + (emp.active_employees || 0), 0);
   const totalCommission = data.employers.reduce((s, emp) => s + Number(emp.commission || 0), 0);
@@ -95,9 +96,9 @@ export default function BrokerPortal() {
         ))}
       </div>
 
-      {activeTab === 'book' && <BookOfBusiness data={data} />}
+      {activeTab === 'book' && <BookOfBusiness data={{ ...data, broker }} />}
       {activeTab === 'renewals' && <Renewals employers={data.employers} />}
-      {activeTab === 'commissions' && <Commissions employers={data.employers} broker={data.broker} totalCommission={totalCommission} />}
+      {activeTab === 'commissions' && <Commissions employers={data.employers} broker={broker} totalCommission={totalCommission} />}
     </div>
   );
 }
@@ -114,7 +115,7 @@ function BookOfBusiness({ data }) {
           </div>
           <div>
             <div style={labelStyle}>EMAIL</div>
-            <div>{data.broker.email}</div>
+            <div>{data.broker.contact_email}</div>
           </div>
           <div>
             <div style={labelStyle}>LICENSE</div>

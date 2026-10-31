@@ -118,6 +118,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'accounts.permissions.IsAuthenticated',
     ],
+    'EXCEPTION_HANDLER': 'core.exception_handler.debug_exception_handler',
 }
 
 SIMPLE_JWT = {

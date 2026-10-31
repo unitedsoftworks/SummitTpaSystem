@@ -118,9 +118,7 @@ class PaymentBatchViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Can only modify draft batches'}, status=400)
         item = PaymentBatchItem.objects.create(
             batch=batch,
-            payee_type=request.data.get('payee_type'),
-            payee_carrier_id=request.data.get('payee_carrier_id'),
-            payee_broker_id=request.data.get('payee_broker_id'),
+            vendor_id=request.data.get('vendor_id'),
             amount=request.data.get('amount'),
             reference=request.data.get('reference', ''),
             description=request.data.get('description', ''),

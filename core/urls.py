@@ -4,11 +4,11 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'associations', views.AssociationViewSet)
-router.register(r'brokers', views.BrokerViewSet)
-router.register(r'carriers', views.CarrierViewSet)
+router.register(r'vendors', views.VendorViewSet)
 router.register(r'employers', views.EmployerViewSet)
 router.register(r'locations', views.LocationViewSet)
 router.register(r'products', views.BenefitProductViewSet)
+router.register(r'premium-allocations', views.PremiumAllocationViewSet)
 router.register(r'plans', views.BenefitPlanViewSet)
 router.register(r'employees', views.EmployeeViewSet)
 router.register(r'dependents', views.DependentViewSet)
@@ -34,10 +34,10 @@ router.register(r'audit-log', views.AuditLogViewSet)
 urlpatterns = [
     path('dashboard/', views.dashboard),
     path('finance-summary/', views.finance_summary),
-    path('carrier-detail/<int:carrier_id>/', views.carrier_detail),
+    path('vendor-detail/<int:vendor_id>/', views.vendor_detail),
     path('employee-portal/<int:employee_id>/', views.employee_portal),
     path('employer-portal/<int:employer_id>/', views.employer_portal),
-    path('broker-portal/<int:broker_id>/', views.broker_portal),
+    path('broker-portal/<int:vendor_id>/', views.broker_portal),
     path('association-portal/<int:association_id>/', views.association_portal),
     path('exceptions/<int:exception_id>/ai-resolve/', views.ai_resolve_exception),
     path('', include(router.urls)),

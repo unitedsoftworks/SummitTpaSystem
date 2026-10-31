@@ -2,7 +2,8 @@ from datetime import date, timedelta
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 from core.models import (
-    Association, Broker, Carrier, Employer, BenefitPlan, Employee,
+    Association, Vendor, Employer, BenefitProduct, BenefitPlan,
+    PremiumAllocation, Employee,
     Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
@@ -21,12 +22,22 @@ class Command(BaseCommand):
         Enrollment.objects.all().delete()
         Dependent.objects.all().delete()
         Employee.objects.all().delete()
+        PremiumAllocation.objects.all().delete()
         BenefitPlan.objects.all().delete()
+        BenefitProduct.objects.all().delete()
         Employer.objects.all().delete()
-        Carrier.objects.all().delete()
-        Broker.objects.all().delete()
+        Vendor.objects.all().delete()
         Association.objects.all().delete()
         AuditLog.objects.all().delete()
+        EligibilityRecord.objects.all().delete()
+        CobraEvent.objects.all().delete()
+        OpenEnrollmentPeriod.objects.all().delete()
+        Document.objects.all().delete()
+        Notification.objects.all().delete()
+        Message.objects.all().delete()
+        LifeEvent.objects.all().delete()
+        Reimbursement.objects.all().delete()
+        Payment.objects.all().delete()
 
         self.stdout.write('Creating associations...')
         ar_chamber = Association.objects.create(
@@ -46,54 +57,61 @@ class Command(BaseCommand):
             address='300 SE 14th St\nBentonville, AR 72712',
         )
 
-        self.stdout.write('Creating brokers...')
-        broker_summit = Broker.objects.create(
-            name='Greg Patterson',
-            agency='Summit Benefits Group',
-            email='greg@summitbenefits.example.com',
-            phone='501-555-8000',
-            license_number='AR-INS-44821',
-            license_state='AR',
-            commission_rate=Decimal('5.00'),
-        )
-        broker_delta = Broker.objects.create(
-            name='Angela Rivera',
-            agency='Delta Insurance Advisors',
-            email='angela@deltainsurance.example.com',
-            phone='870-555-8100',
-            license_number='AR-INS-55932',
-            license_state='AR',
-            commission_rate=Decimal('4.50'),
-        )
-
-        self.stdout.write('Creating carriers...')
-        bcbs = Carrier.objects.create(
+        self.stdout.write('Creating vendors...')
+        bcbs = Vendor.objects.create(
             name='Blue Cross Blue Shield of Arkansas',
-            carrier_type='medical',
+            vendor_type='carrier',
             contact_name='Sarah Mitchell',
             contact_email='sarah.mitchell@bcbsar.example.com',
             contact_phone='501-555-0101',
         )
-        delta_dental = Carrier.objects.create(
+        delta_dental = Vendor.objects.create(
             name='Delta Dental of Arkansas',
-            carrier_type='dental',
+            vendor_type='carrier',
             contact_name='James Parker',
             contact_email='james.parker@deltadentalar.example.com',
             contact_phone='501-555-0202',
         )
-        vsp = Carrier.objects.create(
+        vsp = Vendor.objects.create(
             name='VSP Vision Care',
-            carrier_type='vision',
+            vendor_type='carrier',
             contact_name='Linda Chen',
             contact_email='linda.chen@vsp.example.com',
             contact_phone='800-555-0303',
         )
-        unum = Carrier.objects.create(
+        unum = Vendor.objects.create(
             name='Unum Life Insurance',
-            carrier_type='life',
+            vendor_type='carrier',
             contact_name='Robert Davis',
             contact_email='robert.davis@unum.example.com',
             contact_phone='800-555-0404',
+        )
+        ppa_admin = Vendor.objects.create(
+            name='PPA Administration',
+            vendor_type='tpa',
+            contact_name='Summit TPA',
+            contact_email='admin@summittpa.example.com',
+            contact_phone='501-555-0500',
+        )
+        broker_summit = Vendor.objects.create(
+            name='Greg Patterson',
+            vendor_type='broker',
+            agency='Summit Benefits Group',
+            contact_email='greg@summitbenefits.example.com',
+            contact_phone='501-555-8000',
+            license_number='AR-INS-44821',
+            license_state='AR',
+            commission_rate=Decimal('5.00'),
+        )
+        broker_delta = Vendor.objects.create(
+            name='Angela Rivera',
+            vendor_type='broker',
+            agency='Delta Insurance Advisors',
+            contact_email='angela@deltainsurance.example.com',
+            contact_phone='870-555-8100',
+            license_number='AR-INS-55932',
+            license_state='AR',
+            commission_rate=Decimal('5.00'),
         )
 
         self.stdout.write('Creating employers...')
@@ -105,7 +123,6 @@ class Command(BaseCommand):
             contact_email='tom@ozarkmfg.example.com',
             contact_phone='501-555-1000',
             association=ar_chamber,
-            broker=broker_summit,
             billing_cycle_day=1,
         )
         razorback = Employer.objects.create(
@@ -116,7 +133,6 @@ class Command(BaseCommand):
             contact_email='maria@razorbacktech.example.com',
             contact_phone='479-555-2000',
             association=nwa_mfg,
-            broker=broker_summit,
             billing_cycle_day=15,
         )
         natural = Employer.objects.create(
@@ -127,7 +143,6 @@ class Command(BaseCommand):
             contact_email='david@naturalstatelogistics.example.com',
             contact_phone='870-555-3000',
             association=ar_chamber,
-            broker=broker_delta,
             billing_cycle_day=1,
         )
         diamond = Employer.objects.create(
@@ -138,7 +153,6 @@ class Command(BaseCommand):
             contact_email='rfoster@diamondcitydental.example.com',
             contact_phone='501-555-4000',
             association=ar_chamber,
-            broker=broker_delta,
             billing_cycle_day=1,
         )
         buffalo = Employer.objects.create(
@@ -149,72 +163,106 @@ class Command(BaseCommand):
             contact_email='jake@buffaloriver.example.com',
             contact_phone='870-555-5000',
             association=nwa_mfg,
-            broker=broker_summit,
             billing_cycle_day=15,
         )
 
-        self.stdout.write('Creating benefit plans...')
+        self.stdout.write('Creating benefit products and tiers with allocations...')
         today = date.today()
         jan1 = date(today.year, 1, 1)
+
+        employer_broker = {
+            ozark.id: broker_summit,
+            razorback.id: broker_summit,
+            natural.id: broker_delta,
+            diamond.id: broker_delta,
+            buffalo.id: broker_summit,
+        }
 
         plans = {}
         for employer in [ozark, razorback, natural, diamond, buffalo]:
             plans[employer.id] = {}
-            for tier, tier_label, med_prem, med_er, med_ee in [
-                ('employee_only', 'Employee Only', 650, 520, 130),
-                ('employee_spouse', 'Employee + Spouse', 1350, 945, 405),
-                ('family', 'Family', 1800, 1170, 630),
+            broker = employer_broker[employer.id]
+
+            # Medical product
+            med_product = BenefitProduct.objects.create(
+                employer=employer,
+                name='BCBS PPO',
+                plan_type='medical',
+                effective_date=jan1,
+            )
+            for tier, med_carrier, admin_fee, broker_fee in [
+                ('employee_only', 580, 40, 30),
+                ('employee_spouse', 1200, 80, 70),
+                ('family', 1600, 110, 90),
             ]:
                 p = BenefitPlan.objects.create(
-                    employer=employer, carrier=bcbs,
-                    name=f'BCBS PPO - {tier_label}',
-                    plan_type='medical', tier=tier,
-                    monthly_premium=Decimal(med_prem),
-                    employer_contribution=Decimal(med_er),
-                    employee_deduction=Decimal(med_ee),
-                    effective_date=jan1,
+                    product=med_product,
+                    tier=tier,
+                    employer_contribution=Decimal(str(round(med_carrier * 0.8))),
+                    employee_deduction=Decimal(str(round((med_carrier + admin_fee + broker_fee) - round(med_carrier * 0.8)))),
                 )
+                PremiumAllocation.objects.create(plan=p, vendor=bcbs, label='Carrier Premium', amount=Decimal(str(med_carrier)))
+                PremiumAllocation.objects.create(plan=p, vendor=ppa_admin, label='TPA Admin Fee', amount=Decimal(str(admin_fee)))
+                PremiumAllocation.objects.create(plan=p, vendor=broker, label='Broker Fee', amount=Decimal(str(broker_fee)))
                 plans[employer.id][f'medical_{tier}'] = p
 
-            for tier, tier_label, prem, er_c, ee_d in [
-                ('employee_only', 'Employee Only', 45, 36, 9),
-                ('family', 'Family', 120, 84, 36),
+            # Dental product
+            dental_product = BenefitProduct.objects.create(
+                employer=employer,
+                name='Delta Dental PPO',
+                plan_type='dental',
+                effective_date=jan1,
+            )
+            for tier, dental_carrier, admin_fee, broker_fee in [
+                ('employee_only', 35, 5, 5),
+                ('family', 95, 13, 12),
             ]:
                 p = BenefitPlan.objects.create(
-                    employer=employer, carrier=delta_dental,
-                    name=f'Delta Dental PPO - {tier_label}',
-                    plan_type='dental', tier=tier,
-                    monthly_premium=Decimal(prem),
-                    employer_contribution=Decimal(er_c),
-                    employee_deduction=Decimal(ee_d),
-                    effective_date=jan1,
+                    product=dental_product,
+                    tier=tier,
+                    employer_contribution=Decimal(str(round(dental_carrier * 0.8))),
+                    employee_deduction=Decimal(str(round((dental_carrier + admin_fee + broker_fee) - round(dental_carrier * 0.8)))),
                 )
+                PremiumAllocation.objects.create(plan=p, vendor=delta_dental, label='Carrier Premium', amount=Decimal(str(dental_carrier)))
+                PremiumAllocation.objects.create(plan=p, vendor=ppa_admin, label='TPA Admin Fee', amount=Decimal(str(admin_fee)))
+                PremiumAllocation.objects.create(plan=p, vendor=broker, label='Broker Fee', amount=Decimal(str(broker_fee)))
                 plans[employer.id][f'dental_{tier}'] = p
 
+            # Vision product
+            vision_product = BenefitProduct.objects.create(
+                employer=employer,
+                name='VSP Vision',
+                plan_type='vision',
+                effective_date=jan1,
+            )
             p = BenefitPlan.objects.create(
-                employer=employer, carrier=vsp,
-                name='VSP Vision - Employee Only',
-                plan_type='vision', tier='employee_only',
-                monthly_premium=Decimal('18'),
+                product=vision_product,
+                tier='employee_only',
                 employer_contribution=Decimal('18'),
                 employee_deduction=Decimal('0'),
-                effective_date=jan1,
             )
+            PremiumAllocation.objects.create(plan=p, vendor=vsp, label='Carrier Premium', amount=Decimal('15'))
+            PremiumAllocation.objects.create(plan=p, vendor=ppa_admin, label='TPA Admin Fee', amount=Decimal('3'))
             plans[employer.id]['vision_employee_only'] = p
 
-            p = BenefitPlan.objects.create(
-                employer=employer, carrier=unum,
+            # Life product
+            life_product = BenefitProduct.objects.create(
+                employer=employer,
                 name='Unum Basic Life - $50k',
-                plan_type='life', tier='employee_only',
-                monthly_premium=Decimal('12'),
-                employer_contribution=Decimal('12'),
-                employee_deduction=Decimal('0'),
+                plan_type='life',
                 effective_date=jan1,
             )
+            p = BenefitPlan.objects.create(
+                product=life_product,
+                tier='employee_only',
+                employer_contribution=Decimal('12'),
+                employee_deduction=Decimal('0'),
+            )
+            PremiumAllocation.objects.create(plan=p, vendor=unum, label='Carrier Premium', amount=Decimal('10'))
+            PremiumAllocation.objects.create(plan=p, vendor=ppa_admin, label='TPA Admin Fee', amount=Decimal('2'))
             plans[employer.id]['life_employee_only'] = p
 
         self.stdout.write('Creating employees and enrollments...')
-        # (employer, first, last, email, dob, ssn4, hire, status, class, job_title, department, location, salary, hours)
         employees_data = [
             (ozark, 'John', 'Williams', 'john.w@ozarkmfg.example.com', '1985-03-15', '4521', '2020-06-01', 'active', 'full_time', 'Plant Manager', 'Operations', 'Building A', 82000, 40),
             (ozark, 'Lisa', 'Thompson', 'lisa.t@ozarkmfg.example.com', '1990-08-22', '7832', '2021-02-15', 'active', 'full_time', 'Quality Inspector', 'Quality', 'Building A', 54000, 40),
@@ -402,13 +450,13 @@ class Command(BaseCommand):
         for employer in [ozark, razorback, natural, diamond, buffalo]:
             active_medical = Enrollment.objects.filter(
                 employee__employer=employer,
-                plan__plan_type='medical',
+                plan__product__plan_type='medical',
                 status__in=['active', 'carrier_confirmed'],
             )
             expected = sum(e.plan.monthly_premium for e in active_medical)
 
             CarrierInvoice.objects.create(
-                carrier=bcbs,
+                vendor=bcbs,
                 employer=employer,
                 invoice_number=f"BCBS-{employer.id}-{last_month_start.strftime('%Y%m')}",
                 billing_period_start=last_month_start,
@@ -421,13 +469,13 @@ class Command(BaseCommand):
 
             active_dental = Enrollment.objects.filter(
                 employee__employer=employer,
-                plan__plan_type='dental',
+                plan__product__plan_type='dental',
                 status__in=['active', 'carrier_confirmed'],
             )
             expected_dental = sum(e.plan.monthly_premium for e in active_dental)
 
             CarrierInvoice.objects.create(
-                carrier=delta_dental,
+                vendor=delta_dental,
                 employer=employer,
                 invoice_number=f"DD-{employer.id}-{last_month_start.strftime('%Y%m')}",
                 billing_period_start=last_month_start,
@@ -439,7 +487,7 @@ class Command(BaseCommand):
             )
 
         CarrierInvoice.objects.create(
-            carrier=bcbs,
+            vendor=bcbs,
             employer=ozark,
             invoice_number=f"BCBS-{ozark.id}-{today.strftime('%Y%m')}-ADJ",
             billing_period_start=today.replace(day=1),
@@ -451,7 +499,7 @@ class Command(BaseCommand):
             due_date=today + timedelta(days=28),
         )
         CarrierInvoice.objects.create(
-            carrier=delta_dental,
+            vendor=delta_dental,
             employer=diamond,
             invoice_number=f"DD-{diamond.id}-{today.strftime('%Y%m')}-ADJ",
             billing_period_start=today.replace(day=1),
@@ -605,18 +653,6 @@ class Command(BaseCommand):
             action='invoice_discrepancy', entity_type='CarrierInvoice', entity_id=2,
             description='Discrepancy found on Delta Dental invoice for Diamond City Dental - $45.00 overbilled (waived coverage)',
         )
-        AuditLog.objects.create(
-            action='deduction_generated', entity_type='PayrollDeduction', entity_id=0,
-            description=f'Monthly payroll deductions generated for {today.strftime("%B %Y")}',
-        )
-        AuditLog.objects.create(
-            action='eligibility_sent', entity_type='Carrier', entity_id=bcbs.id,
-            description='Eligibility file sent to Blue Cross Blue Shield of Arkansas',
-        )
-        AuditLog.objects.create(
-            action='eligibility_sent', entity_type='Carrier', entity_id=delta_dental.id,
-            description='Eligibility file sent to Delta Dental of Arkansas',
-        )
 
         self.stdout.write('Creating payments...')
         employers_list = [ozark, razorback, natural, diamond, buffalo]
@@ -662,18 +698,12 @@ class Command(BaseCommand):
         self.stdout.write('Creating messages...')
         all_employees = list(Employee.objects.all())
         messages_data = [
-            (all_employees[0], 'inbound', 'portal', 'Question about dental coverage', 'Hi, I wanted to check if orthodontics is covered under my dental plan for my daughter. She needs braces and the dentist quoted $4,500. Can you let me know what our plan covers?', 'John Williams', 'unread', 'benefits'),
-            (all_employees[1], 'inbound', 'email', 'Need new insurance cards', 'I lost my insurance cards and need replacements. Can you mail new ones to my address on file? Thanks!', 'Lisa Thompson', 'read', 'general'),
-            (all_employees[3], 'inbound', 'portal', 'Enrollment status question', 'I submitted my enrollment forms two weeks ago but still show as pending. When will my coverage be active?', 'Sarah Davis', 'replied', 'enrollment'),
-            (all_employees[7], 'outbound', 'email', 'Open enrollment reminder', 'This is a reminder that open enrollment ends on December 15th. Please log into the portal to review your benefit elections for the upcoming plan year.', 'Summit TPA', 'closed', 'enrollment'),
-            (all_employees[4], 'inbound', 'phone', 'Claim denied - need explanation', 'I received an EOB showing my physical therapy claim was denied. I was told I had a referral. Can someone look into this?', 'Robert Wilson', 'unread', 'claims'),
-            (all_employees[8], 'inbound', 'portal', 'Adding spouse to plan', 'I got married last month and need to add my spouse to my medical and dental plans. What documents do I need to submit?', 'Ashley Rodriguez', 'unread', 'enrollment'),
-            (all_employees[12], 'inbound', 'email', 'FSA balance question', 'Can you tell me how much is left in my FSA for this year? I want to make sure I use it before the deadline.', 'James Moore', 'read', 'billing'),
-            (all_employees[16], 'inbound', 'portal', 'Pre-authorization needed', "My doctor wants to schedule an MRI. Do I need pre-authorization from the insurance company? If so, how do I get that started?", 'Monica Chen', 'unread', 'benefits'),
-            (all_employees[10], 'outbound', 'portal', 'COBRA eligibility notice', 'This notice is to inform you of your rights under COBRA continuation coverage. Please review the attached documents and respond within 60 days.', 'Summit TPA', 'read', 'benefits'),
-            (all_employees[20], 'inbound', 'portal', 'Vision benefit question', 'Does my vision plan cover contact lenses? I usually get a year supply and want to know if I should use my benefit before year end.', 'Nathan Price', 'unread', 'benefits'),
-            (all_employees[14], 'inbound', 'email', 'Complaint about provider network', "My primary care doctor is no longer in-network and I wasn't notified. I've been seeing them for 5 years. Is there a transition period?", 'Brandon White', 'unread', 'complaint'),
-            (all_employees[2], 'inbound', 'phone', 'Dependent coverage verification', 'I need a letter verifying coverage for my son for his college enrollment. They need it by next Friday.', 'Michael Brown', 'read', 'general'),
+            (all_employees[0], 'inbound', 'portal', 'Question about dental coverage', 'Hi, I wanted to check if orthodontics is covered under my dental plan for my daughter.', 'John Williams', 'unread', 'benefits'),
+            (all_employees[1], 'inbound', 'email', 'Need new insurance cards', 'I lost my insurance cards and need replacements.', 'Lisa Thompson', 'read', 'general'),
+            (all_employees[3], 'inbound', 'portal', 'Enrollment status question', 'I submitted my enrollment forms two weeks ago but still show as pending.', 'Sarah Davis', 'replied', 'enrollment'),
+            (all_employees[7], 'outbound', 'email', 'Open enrollment reminder', 'This is a reminder that open enrollment ends on December 15th.', 'Summit TPA', 'closed', 'enrollment'),
+            (all_employees[4], 'inbound', 'phone', 'Claim denied - need explanation', 'I received an EOB showing my physical therapy claim was denied.', 'Robert Wilson', 'unread', 'claims'),
+            (all_employees[8], 'inbound', 'portal', 'Adding spouse to plan', 'I got married last month and need to add my spouse to my medical and dental plans.', 'Ashley Rodriguez', 'unread', 'enrollment'),
         ]
         for emp, direction, channel, subject, body, sender, status, category in messages_data:
             Message.objects.create(
@@ -685,15 +715,9 @@ class Command(BaseCommand):
 
         self.stdout.write('Creating life events...')
         life_events_data = [
-            (all_employees[8], 'marriage', today - timedelta(days=25), 'Married on October 1st. Need to add spouse to medical and dental plans.', 'pending', False, None),
-            (all_employees[0], 'birth', today - timedelta(days=60), 'New baby girl born August 27th. Adding as dependent to family plan.', 'completed', True, today - timedelta(days=55)),
-            (all_employees[7], 'loss_coverage', today - timedelta(days=15), "Spouse lost coverage through their employer due to layoff. Need to add spouse to my plan.", 'approved', True, today - timedelta(days=10)),
-            (all_employees[14], 'divorce', today - timedelta(days=40), 'Divorce finalized. Need to remove former spouse from all coverage.', 'completed', True, today - timedelta(days=35)),
-            (all_employees[3], 'address_change', today - timedelta(days=5), 'Moved to new address: 142 Oak Street, Little Rock, AR 72201.', 'approved', False, None),
-            (all_employees[12], 'death', today - timedelta(days=90), 'Dependent (father) passed away. Remove from coverage.', 'completed', True, today - timedelta(days=85)),
-            (all_employees[21], 'gain_coverage', today - timedelta(days=10), 'Spouse started new job with benefits. Want to waive duplicate dental coverage.', 'pending', False, None),
-            (all_employees[17], 'birth', today - timedelta(days=3), 'Baby boy born October 23rd. Need to add to medical plan.', 'pending', False, None),
-            (all_employees[4], 'job_change', today - timedelta(days=30), 'Moved from part-time to full-time. Now eligible for full benefit package.', 'completed', True, today - timedelta(days=28)),
+            (all_employees[8], 'marriage', today - timedelta(days=25), 'Married on October 1st. Need to add spouse.', 'pending', False, None),
+            (all_employees[0], 'birth', today - timedelta(days=60), 'New baby girl born. Adding as dependent.', 'completed', True, today - timedelta(days=55)),
+            (all_employees[7], 'loss_coverage', today - timedelta(days=15), 'Spouse lost coverage. Need to add spouse to my plan.', 'approved', True, today - timedelta(days=10)),
         ]
         for emp, event_type, event_date, desc, status, docs, eff_date in life_events_data:
             LifeEvent.objects.create(
@@ -705,33 +729,21 @@ class Command(BaseCommand):
 
         self.stdout.write('Creating reimbursements...')
         reimbursements_data = [
-            (all_employees[0], 'hra', Decimal('250.00'), Decimal('250.00'), today - timedelta(days=20), 'Annual eye exam and prescription glasses', 'vision', True, 'paid', today - timedelta(days=10)),
-            (all_employees[7], 'fsa', Decimal('125.00'), Decimal('125.00'), today - timedelta(days=15), 'Prescription medications - 3 month supply', 'prescription', True, 'approved', None),
-            (all_employees[2], 'hra', Decimal('450.00'), None, today - timedelta(days=5), 'Physical therapy copays - 6 sessions', 'medical', False, 'submitted', None),
-            (all_employees[12], 'fsa', Decimal('85.00'), Decimal('85.00'), today - timedelta(days=30), 'Dental cleaning copay', 'dental', True, 'paid', today - timedelta(days=22)),
-            (all_employees[16], 'hsa', Decimal('320.00'), Decimal('320.00'), today - timedelta(days=12), 'Contact lenses and solution', 'vision', True, 'approved', None),
-            (all_employees[4], 'hra', Decimal('1200.00'), None, today - timedelta(days=3), 'MRI of knee - out of pocket after deductible', 'medical', True, 'in_review', None),
-            (all_employees[8], 'fsa', Decimal('175.00'), Decimal('0.00'), today - timedelta(days=45), 'Gym membership (wellness)', 'other', True, 'denied', None),
-            (all_employees[20], 'hra', Decimal('95.00'), None, today - timedelta(days=2), 'Urgent care visit copay', 'medical', False, 'submitted', None),
-            (all_employees[14], 'fsa', Decimal('550.00'), Decimal('550.00'), today - timedelta(days=25), 'Orthodontic payment', 'dental', True, 'paid', today - timedelta(days=18)),
-            (all_employees[10], 'hsa', Decimal('200.00'), None, today - timedelta(days=8), 'Mental health counseling - 2 sessions', 'mental_health', True, 'in_review', None),
-            (all_employees[3], 'hra', Decimal('65.00'), Decimal('65.00'), today - timedelta(days=35), 'Flu shot at pharmacy', 'medical', True, 'paid', today - timedelta(days=28)),
-            (all_employees[17], 'fsa', Decimal('380.00'), None, today - timedelta(days=1), 'Prescription sunglasses', 'vision', False, 'submitted', None),
+            (all_employees[0], 'hra', Decimal('250.00'), Decimal('250.00'), today - timedelta(days=20), 'Annual eye exam and glasses', 'vision', True, 'paid', today - timedelta(days=10)),
+            (all_employees[7], 'fsa', Decimal('125.00'), Decimal('125.00'), today - timedelta(days=15), 'Prescription medications', 'prescription', True, 'approved', None),
+            (all_employees[2], 'hra', Decimal('450.00'), None, today - timedelta(days=5), 'Physical therapy copays', 'medical', False, 'submitted', None),
         ]
         for emp, rtype, amt_req, amt_app, exp_date, desc, cat, receipt, status, paid_date in reimbursements_data:
-            r = Reimbursement.objects.create(
+            Reimbursement.objects.create(
                 employee=emp, reimbursement_type=rtype,
                 amount_requested=amt_req, amount_approved=amt_app,
                 expense_date=exp_date, description=desc,
                 category=cat, receipt_received=receipt, status=status,
                 paid_date=paid_date,
                 reviewed_by=random.choice(staff_names) if status in ('approved', 'paid', 'in_review', 'denied') else '',
-                denial_reason='Gym memberships are not an eligible expense under FSA guidelines.' if status == 'denied' else '',
             )
 
-        # --- Eligibility Records ---
         self.stdout.write('Creating eligibility records...')
-        EligibilityRecord.objects.all().delete()
         eligibility_data = [
             ('834_initial', 'outbound', 'sent', 'TXN-2026-001'),
             ('834_initial', 'outbound', 'accepted', 'TXN-2026-002'),
@@ -739,27 +751,17 @@ class Command(BaseCommand):
             ('834_change', 'outbound', 'pending', ''),
             ('834_term', 'outbound', 'sent', 'TXN-2026-005'),
             ('834_initial', 'outbound', 'rejected', 'TXN-2026-006'),
-            ('834_initial', 'outbound', 'accepted', 'TXN-2026-007'),
-            ('834_change', 'outbound', 'error', 'TXN-2026-008'),
-            ('manual', 'outbound', 'accepted', ''),
-            ('834_initial', 'inbound', 'acknowledged', 'TXN-2026-010'),
-            ('834_initial', 'outbound', 'accepted', 'TXN-2026-011'),
-            ('834_change', 'outbound', 'sent', 'TXN-2026-012'),
-            ('834_term', 'outbound', 'accepted', 'TXN-2026-013'),
-            ('manual', 'inbound', 'accepted', ''),
-            ('834_initial', 'outbound', 'pending', ''),
         ]
-        all_enrollments = list(Enrollment.objects.select_related('employee', 'plan', 'plan__carrier').all())
+        all_enrollments = list(Enrollment.objects.select_related('employee', 'plan', 'plan__product').all())
         for i, (ftype, direction, status, txn_id) in enumerate(eligibility_data):
             enrollment = all_enrollments[i % len(all_enrollments)]
+            carrier_vendor = enrollment.plan.allocations.filter(vendor__vendor_type='carrier').first()
             error_msg = ''
             if status == 'rejected':
-                error_msg = 'Member ID not found in carrier system. Verify SSN and DOB match.'
-            elif status == 'error':
-                error_msg = 'EDI connection timeout. Carrier system unavailable.'
+                error_msg = 'Member ID not found in carrier system.'
             EligibilityRecord.objects.create(
                 employee=enrollment.employee,
-                carrier=enrollment.plan.carrier,
+                vendor=carrier_vendor.vendor if carrier_vendor else bcbs,
                 plan=enrollment.plan,
                 file_type=ftype,
                 direction=direction,
@@ -769,38 +771,16 @@ class Command(BaseCommand):
                 member_count=1 if ftype != '834_initial' else enrollment.members.count() or 1,
                 effective_date=enrollment.effective_date,
             )
-        # Create audit log entries for eligibility
-        AuditLog.objects.create(
-            action='eligibility_sent',
-            entity_type='Carrier',
-            entity_id=all_enrollments[0].plan.carrier.id,
-            description=f"Eligibility file sent to {all_enrollments[0].plan.carrier.name}",
-        )
-        AuditLog.objects.create(
-            action='eligibility_sent',
-            entity_type='Carrier',
-            entity_id=all_enrollments[1].plan.carrier.id,
-            description=f"Eligibility file sent to {all_enrollments[1].plan.carrier.name}",
-        )
 
-        # --- COBRA Events ---
         self.stdout.write('Creating COBRA events...')
-        CobraEvent.objects.all().delete()
-        today = date.today()
         cobra_data = [
             (2, 0, 'termination', today - timedelta(days=45), 'elected', 'current', Decimal('850.00')),
             (5, 1, 'hours_reduction', today - timedelta(days=30), 'pending', 'na', Decimal('620.00')),
             (8, 2, 'divorce', today - timedelta(days=90), 'elected', 'current', Decimal('1100.00')),
-            (10, 0, 'termination', today - timedelta(days=120), 'elected', 'late', Decimal('750.00')),
-            (15, 3, 'dependent_age', today - timedelta(days=15), 'pending', 'na', Decimal('380.00')),
-            (18, 1, 'termination', today - timedelta(days=180), 'elected', 'lapsed', Decimal('900.00')),
-            (3, 4, 'death', today - timedelta(days=60), 'elected', 'current', Decimal('1250.00')),
-            (20, 2, 'termination', today - timedelta(days=10), 'pending', 'na', Decimal('550.00')),
         ]
         for emp_idx, emp_grp, event, evt_date, election, payment, premium in cobra_data:
             emp = all_employees[emp_idx % len(all_employees)]
-            employer = list(Employer.objects.all())[emp_grp % Employer.objects.count()]
-            notif_date = evt_date + timedelta(days=14) if election != 'pending' else None
+            employer = employers_list[emp_grp % len(employers_list)]
             election_deadline = evt_date + timedelta(days=60)
             cov_start = evt_date + timedelta(days=1) if election == 'elected' else None
             cov_end = cov_start + timedelta(days=547) if cov_start else None
@@ -809,7 +789,6 @@ class Command(BaseCommand):
                 employer=employer,
                 qualifying_event=event,
                 event_date=evt_date,
-                notification_sent_date=notif_date,
                 election_deadline=election_deadline,
                 election_status=election,
                 coverage_start=cov_start,
@@ -820,20 +799,12 @@ class Command(BaseCommand):
                 qualified_beneficiaries=2 if event in ('divorce', 'death') else 1,
             )
 
-        # --- Open Enrollment Periods ---
         self.stdout.write('Creating open enrollment periods...')
-        OpenEnrollmentPeriod.objects.all().delete()
-        all_employers = list(Employer.objects.all())
         oe_data = [
             ('2026 Annual Open Enrollment', '2026-01-01', '2026-12-31', '2025-11-01', '2025-11-30', 'completed', 6, 5, 1),
             ('2027 Annual Open Enrollment', '2027-01-01', '2027-12-31', '2026-11-01', '2026-11-30', 'upcoming', 7, 0, 0),
-            ('2026 Annual Open Enrollment', '2026-01-01', '2026-12-31', '2025-11-01', '2025-11-30', 'completed', 5, 4, 1),
-            ('2027 Annual Open Enrollment', '2027-01-01', '2027-12-31', '2026-11-01', '2026-11-30', 'upcoming', 5, 0, 0),
-            ('2026 Mid-Year Enrollment', '2026-07-01', '2026-12-31', '2026-06-01', '2026-06-30', 'completed', 4, 3, 0),
-            ('2026 Annual Open Enrollment', '2026-01-01', '2026-12-31', '2025-11-01', '2025-11-30', 'completed', 3, 3, 0),
-            ('2027 Annual Open Enrollment', '2027-01-01', '2027-12-31', '2026-10-15', '2026-11-15', 'open', 3, 1, 0),
-            ('2027 Annual Open Enrollment', '2027-01-01', '2027-12-31', '2026-11-01', '2026-11-30', 'draft', 4, 0, 0),
         ]
+        all_employers = list(Employer.objects.all())
         for i, (name, pys, pye, es, ee, status, elig, enrolled, waived) in enumerate(oe_data):
             OpenEnrollmentPeriod.objects.create(
                 employer=all_employers[i % len(all_employers)],
@@ -848,25 +819,15 @@ class Command(BaseCommand):
                 waived_employees=waived,
             )
 
-        # --- Documents ---
         self.stdout.write('Creating documents...')
-        Document.objects.all().delete()
         doc_data = [
-            ('BCBS PPO Plan Document 2026', 'plan_document', 0, None, None, 'BCBS_PPO_Plan_2026.pdf', 2450000),
-            ('Delta Dental SPD', 'spd', 1, None, None, 'Delta_Dental_SPD_2026.pdf', 1800000),
-            ('VSP Vision SBC', 'sbc', 2, None, None, 'VSP_Vision_SBC.pdf', 950000),
-            ('Q3 2026 Census Report', 'census', 0, None, None, 'Census_Q3_2026.xlsx', 450000),
-            ('COBRA Election Notice Template', 'cobra_notice', None, None, None, 'COBRA_Election_Notice.pdf', 380000),
-            ('ACA 1095-C Filing 2025', 'compliance', None, None, None, 'ACA_1095C_2025.pdf', 5200000),
-            ('Enrollment Change Form', 'enrollment_form', None, None, None, 'Enrollment_Change_Form.pdf', 290000),
-            ('Unum Life Rate Sheet', 'plan_document', 3, None, None, 'Unum_Life_Rates_2026.pdf', 1100000),
-            ('Invoice Reconciliation Oct 2026', 'invoice', 0, None, None, 'Invoice_Recon_Oct2026.xlsx', 680000),
-            ('Employee Handbook Benefits Section', 'other', 1, None, None, 'Benefits_Handbook_Section.docx', 3400000),
-            ('New Hire Enrollment Guide', 'enrollment_form', None, None, None, 'New_Hire_Guide.pdf', 1750000),
-            ('ID Card Template - Medical', 'id_card', None, None, None, 'ID_Card_Template_Medical.pdf', 220000),
+            ('BCBS PPO Plan Document 2026', 'plan_document', 0, 'BCBS_PPO_Plan_2026.pdf', 2450000),
+            ('Delta Dental SPD', 'spd', 1, 'Delta_Dental_SPD_2026.pdf', 1800000),
+            ('VSP Vision SBC', 'sbc', 2, 'VSP_Vision_SBC.pdf', 950000),
+            ('Q3 2026 Census Report', 'census', 0, 'Census_Q3_2026.xlsx', 450000),
+            ('COBRA Election Notice Template', 'cobra_notice', None, 'COBRA_Election_Notice.pdf', 380000),
         ]
-        all_carriers = list(Carrier.objects.all())
-        for title, dtype, emp_idx, carrier_idx, ee_idx, fname, fsize in doc_data:
+        for title, dtype, emp_idx, fname, fsize in doc_data:
             employer = all_employers[emp_idx] if emp_idx is not None else None
             Document.objects.create(
                 title=title,
@@ -874,27 +835,17 @@ class Command(BaseCommand):
                 employer=employer,
                 file_name=fname,
                 file_size=fsize,
-                uploaded_by='Admin' if dtype != 'census' else 'HR Manager',
+                uploaded_by='Admin',
                 status='active',
                 effective_date=date(2026, 1, 1),
             )
 
-        # --- Notifications ---
         self.stdout.write('Creating notifications...')
-        Notification.objects.all().delete()
         notif_data = [
-            ('Invoice discrepancy detected', 'BCBS invoice #BCBS-2026-AU1 has a $352 discrepancy. Review and resolve.', 'warning', 'billing', True, 'Review Invoice', '/staff/invoices'),
-            ('Open enrollment period starting', '2027 open enrollment for Natural State Logistics begins Oct 15. Ensure plan rates are updated.', 'info', 'enrollment', True, 'View OE', '/staff/open-enrollment'),
-            ('COBRA election deadline approaching', 'Nathan Price has 15 days remaining to elect COBRA coverage.', 'urgent', 'cobra', True, 'View COBRA', '/staff/cobra'),
+            ('Invoice discrepancy detected', 'BCBS invoice has a $352 discrepancy. Review and resolve.', 'warning', 'billing', True, 'Review Invoice', '/staff/invoices'),
+            ('Open enrollment period starting', '2027 open enrollment for Natural State Logistics begins Oct 15.', 'info', 'enrollment', True, 'View OE', '/staff/open-enrollment'),
+            ('834 file rejected by carrier', 'Eligibility file TXN-2026-006 was rejected by BCBS.', 'urgent', 'eligibility', True, 'View Details', '/staff/eligibility'),
             ('3 unread employee messages', 'There are 3 unread messages from employees awaiting response.', 'info', 'system', True, 'View Messages', '/staff/messages'),
-            ('834 file rejected by carrier', 'Eligibility file TXN-2026-006 was rejected by BCBS. Member ID not found.', 'urgent', 'eligibility', True, 'View Details', '/staff/eligibility'),
-            ('Payroll deductions generated', 'October 2026 payroll deductions have been generated for all employers.', 'success', 'billing', False, '', ''),
-            ('Life event requires review', 'Marriage life event submitted by Jennifer Martinez requires documentation review.', 'warning', 'enrollment', True, 'Review Event', '/staff/life-events'),
-            ('Monthly compliance reminder', 'ACA reporting deadline for Q3 2026 is approaching. Ensure 1095-C forms are prepared.', 'reminder', 'compliance', True, 'View Documents', '/staff/documents'),
-            ('New employee added', 'William Anderson was added to Ozark Manufacturing Co. and needs enrollment.', 'info', 'enrollment', False, '', ''),
-            ('Reimbursement approved', 'FSA reimbursement for Sarah Davis ($125.00) has been approved and queued for payment.', 'success', 'claims', False, '', ''),
-            ('Carrier rate update available', 'Delta Dental has published 2027 renewal rates. Review before open enrollment.', 'warning', 'billing', True, 'View Carriers', '/staff/carriers'),
-            ('COBRA payment overdue', 'COBRA premium payment for Michael Brown is 30 days past due. Coverage may lapse.', 'urgent', 'cobra', True, 'View COBRA', '/staff/cobra'),
         ]
         for title, msg, ntype, cat, actionable, alabel, aurl in notif_data:
             Notification.objects.create(
@@ -908,32 +859,19 @@ class Command(BaseCommand):
             )
 
         total_employees = Employee.objects.count()
-        total_dependents = Dependent.objects.count()
         total_enrollments = Enrollment.objects.count()
         total_members = EnrollmentMember.objects.count()
         total_claims = Claim.objects.count()
-        total_invoices = CarrierInvoice.objects.count()
-        total_payments = Payment.objects.count()
-        total_messages = Message.objects.count()
-        total_life_events = LifeEvent.objects.count()
-        total_reimbursements = Reimbursement.objects.count()
         self.stdout.write(self.style.SUCCESS(
             f'Done! {Association.objects.count()} associations, '
-            f'{Broker.objects.count()} brokers, '
+            f'{Vendor.objects.count()} vendors, '
             f'{Employer.objects.count()} employers, '
             f'{total_employees} employees, '
-            f'{total_dependents} dependents, '
+            f'{Dependent.objects.count()} dependents, '
             f'{total_enrollments} enrollments, '
             f'{total_members} enrollment members, '
+            f'{PremiumAllocation.objects.count()} premium allocations, '
             f'{total_claims} claims, '
-            f'{total_invoices} invoices, '
-            f'{total_payments} payments, '
-            f'{total_messages} messages, '
-            f'{total_life_events} life events, '
-            f'{total_reimbursements} reimbursements, '
-            f'{EligibilityRecord.objects.count()} eligibility records, '
-            f'{CobraEvent.objects.count()} COBRA events, '
-            f'{OpenEnrollmentPeriod.objects.count()} OE periods, '
-            f'{Document.objects.count()} documents, '
-            f'{Notification.objects.count()} notifications'
+            f'{CarrierInvoice.objects.count()} invoices, '
+            f'{Payment.objects.count()} payments'
         ))

@@ -1,17 +1,27 @@
 from django.contrib import admin
 from .models import (
-    Association, Broker, Carrier, Employer, Location, BenefitProduct, BenefitPlan,
-    Employee, Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
-    CarrierInvoice, AuditLog, Payment, EmployerInvoice,
+    Association, Vendor, PremiumAllocation, Employer, Location, BenefitProduct,
+    BenefitPlan, Employee, Dependent, Enrollment, EnrollmentMember, Claim,
+    PayrollDeduction, CarrierInvoice, AuditLog, Payment, EmployerInvoice,
 )
 
+
+class PremiumAllocationInline(admin.TabularInline):
+    model = PremiumAllocation
+    extra = 1
+
+
+@admin.register(BenefitPlan)
+class BenefitPlanAdmin(admin.ModelAdmin):
+    list_display = ['product', 'tier', 'monthly_premium']
+    inlines = [PremiumAllocationInline]
+
+
 admin.site.register(Association)
-admin.site.register(Broker)
-admin.site.register(Carrier)
+admin.site.register(Vendor)
 admin.site.register(Employer)
 admin.site.register(Location)
 admin.site.register(BenefitProduct)
-admin.site.register(BenefitPlan)
 admin.site.register(Employee)
 admin.site.register(Dependent)
 admin.site.register(Enrollment)

@@ -119,22 +119,11 @@ class PaymentBatch(models.Model):
 
 
 class PaymentBatchItem(models.Model):
-    PAYEE_TYPE_CHOICES = [
-        ('carrier', 'Carrier'),
-        ('broker', 'Broker'),
-        ('vendor', 'Vendor'),
-    ]
     batch = models.ForeignKey(PaymentBatch, on_delete=models.CASCADE, related_name='items')
-    payee_type = models.CharField(max_length=20, choices=PAYEE_TYPE_CHOICES)
-    payee_carrier = models.ForeignKey(
-        'core.Carrier', on_delete=models.SET_NULL, null=True, blank=True,
-    )
-    payee_broker = models.ForeignKey(
-        'core.Broker', on_delete=models.SET_NULL, null=True, blank=True,
-    )
+    vendor = models.ForeignKey('core.Vendor', on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     reference = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.get_payee_type_display()} - ${self.amount}"
+        return f"{self.vendor} - ${self.amount}" if self.vendor else f"${self.amount}"

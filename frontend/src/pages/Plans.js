@@ -59,7 +59,7 @@ export default function Plans() {
 
   useEffect(() => {
     api.get('/employers/').then(r => setEmployers(r.data));
-    api.get('/carriers/').then(r => setCarriers(r.data));
+    api.get('/vendors/?vendor_type=carrier').then(r => setCarriers(r.data));
   }, []);
 
   const loadProducts = () => {

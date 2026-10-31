@@ -12,9 +12,10 @@ def get_current_user():
 class TenantMiddleware(MiddlewareMixin):
     def process_request(self, request):
         if not hasattr(request, 'user') or not request.user.is_authenticated:
-            request.tenant_employers = None
             return
-        request.tenant_employers = request.user.get_employer_scope()
+        scope = request.user.get_employer_scope()
+        if scope is not None:
+            request.tenant_employers = scope
         _thread_local.user = request.user
 
 

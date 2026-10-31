@@ -9,16 +9,17 @@ from rest_framework.response import Response
 
 from accounts.permissions import IsAdmin, IsStaffOrAbove, IsAssociationOrAbove, IsBrokerOrAbove, IsEmployerOrAbove
 from .models import (
-    Association, Broker, Carrier, Employer, Location, BenefitProduct, BenefitPlan, Employee,
+    Association, Vendor, Employer, Location, BenefitProduct, BenefitPlan,
+    PremiumAllocation, Employee,
     Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
     EmployerInvoice, EmployerInvoiceLine, Exception, ExceptionNote,
 )
 from .serializers import (
-    AssociationSerializer, BrokerSerializer,
-    CarrierSerializer, EmployerSerializer, LocationSerializer,
-    BenefitProductSerializer,
+    AssociationSerializer, VendorSerializer,
+    EmployerSerializer, LocationSerializer,
+    BenefitProductSerializer, PremiumAllocationSerializer,
     BenefitPlanSerializer, BenefitPlanTierSerializer,
     EmployeeSerializer, DependentSerializer, EnrollmentSerializer,
     EnrollmentMemberSerializer, ClaimSerializer, PayrollDeductionSerializer,
@@ -36,16 +37,23 @@ class AssociationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffOrAbove]
 
 
-class BrokerViewSet(viewsets.ModelViewSet):
-    queryset = Broker.objects.all()
-    serializer_class = BrokerSerializer
+class VendorViewSet(viewsets.ModelViewSet):
+    queryset = Vendor.objects.all()
+    serializer_class = VendorSerializer
     permission_classes = [IsStaffOrAbove]
 
-
-class CarrierViewSet(viewsets.ModelViewSet):
-    queryset = Carrier.objects.all()
-    serializer_class = CarrierSerializer
-    permission_classes = [IsStaffOrAbove]
+    def get_queryset(self):
+        qs = super().get_queryset()
+        vendor_type = self.request.query_params.get('vendor_type')
+        if vendor_type:
+            qs = qs.filter(vendor_type=vendor_type)
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(contact_name__icontains=search)
+            )
+        return qs
 
 
 class LocationViewSet(viewsets.ModelViewSet):
@@ -64,7 +72,7 @@ class LocationViewSet(viewsets.ModelViewSet):
 
 
 class EmployerViewSet(viewsets.ModelViewSet):
-    queryset = Employer.objects.select_related('association', 'broker').all()
+    queryset = Employer.objects.select_related('association').all()
     serializer_class = EmployerSerializer
     permission_classes = [IsAssociationOrAbove]
 
@@ -75,9 +83,6 @@ class EmployerViewSet(viewsets.ModelViewSet):
         assoc = self.request.query_params.get('association')
         if assoc:
             qs = qs.filter(association_id=assoc)
-        broker = self.request.query_params.get('broker')
-        if broker:
-            qs = qs.filter(broker_id=broker)
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
@@ -89,7 +94,9 @@ class EmployerViewSet(viewsets.ModelViewSet):
 
 
 class BenefitProductViewSet(viewsets.ModelViewSet):
-    queryset = BenefitProduct.objects.select_related('carrier', 'employer').prefetch_related('tiers', 'brokers').all()
+    queryset = BenefitProduct.objects.select_related('employer').prefetch_related(
+        'tiers', 'tiers__allocations', 'tiers__allocations__vendor'
+    ).all()
     serializer_class = BenefitProductSerializer
     permission_classes = [IsEmployerOrAbove]
 
@@ -112,7 +119,10 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
         product = serializer.save()
 
         for tier_data in tiers_data:
-            BenefitPlan.objects.create(product=product, **tier_data)
+            allocations = tier_data.pop('allocations', [])
+            plan = BenefitPlan.objects.create(product=product, **tier_data)
+            for alloc_data in allocations:
+                PremiumAllocation.objects.create(plan=plan, **alloc_data)
 
         AuditLog.objects.create(
             action='create_product',
@@ -139,14 +149,18 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
             for td in tiers_data:
                 tier_key = td['tier']
                 incoming_tier_keys.add(tier_key)
+                allocations = td.pop('allocations', None)
                 if tier_key in existing_tiers:
                     t = existing_tiers[tier_key]
-                    t.monthly_premium = td['monthly_premium']
-                    t.employer_contribution = td['employer_contribution']
-                    t.employee_deduction = td['employee_deduction']
+                    t.employer_contribution = td.get('employer_contribution', t.employer_contribution)
+                    t.employee_deduction = td.get('employee_deduction', t.employee_deduction)
                     t.save()
                 else:
-                    BenefitPlan.objects.create(product=product, **td)
+                    t = BenefitPlan.objects.create(product=product, **td)
+                if allocations is not None:
+                    t.allocations.all().delete()
+                    for alloc_data in allocations:
+                        PremiumAllocation.objects.create(plan=t, **alloc_data)
             for tier_key, t in existing_tiers.items():
                 if tier_key not in incoming_tier_keys:
                     if t.enrollments.filter(status__in=['active', 'carrier_confirmed']).exists():
@@ -171,18 +185,41 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
         tier = request.data.get('tier')
         if product.tiers.filter(tier=tier).exists():
             return Response({'error': 'Tier already exists'}, status=http_status.HTTP_400_BAD_REQUEST)
-        BenefitPlan.objects.create(
+        plan = BenefitPlan.objects.create(
             product=product,
             tier=tier,
-            monthly_premium=request.data.get('monthly_premium', 0),
             employer_contribution=request.data.get('employer_contribution', 0),
             employee_deduction=request.data.get('employee_deduction', 0),
         )
+        allocations = request.data.get('allocations', [])
+        for alloc_data in allocations:
+            PremiumAllocation.objects.create(plan=plan, **alloc_data)
         return Response(BenefitProductSerializer(product).data)
 
 
+class PremiumAllocationViewSet(viewsets.ModelViewSet):
+    queryset = PremiumAllocation.objects.select_related('plan', 'vendor', 'plan__product').all()
+    serializer_class = PremiumAllocationSerializer
+    permission_classes = [IsStaffOrAbove]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        plan_id = self.request.query_params.get('plan')
+        if plan_id:
+            qs = qs.filter(plan_id=plan_id)
+        vendor_id = self.request.query_params.get('vendor')
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            qs = qs.filter(plan__product_id=product_id)
+        return qs
+
+
 class BenefitPlanViewSet(viewsets.ModelViewSet):
-    queryset = BenefitPlan.objects.select_related('product', 'product__carrier', 'product__employer').all()
+    queryset = BenefitPlan.objects.select_related('product', 'product__employer').prefetch_related(
+        'allocations', 'allocations__vendor'
+    ).all()
     serializer_class = BenefitPlanSerializer
     permission_classes = [IsEmployerOrAbove]
 
@@ -241,8 +278,8 @@ class DependentViewSet(viewsets.ModelViewSet):
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
     queryset = Enrollment.objects.select_related(
-        'employee', 'employee__employer', 'plan', 'plan__product', 'plan__product__carrier'
-    ).prefetch_related('members', 'members__dependent').all()
+        'employee', 'employee__employer', 'plan', 'plan__product'
+    ).prefetch_related('members', 'members__dependent', 'plan__allocations__vendor').all()
     serializer_class = EnrollmentSerializer
     permission_classes = [IsEmployerOrAbove]
 
@@ -527,7 +564,7 @@ class PayrollDeductionViewSet(viewsets.ModelViewSet):
 
 
 class CarrierInvoiceViewSet(viewsets.ModelViewSet):
-    queryset = CarrierInvoice.objects.select_related('carrier', 'employer').all()
+    queryset = CarrierInvoice.objects.select_related('vendor', 'employer').all()
     serializer_class = CarrierInvoiceSerializer
     permission_classes = [IsStaffOrAbove]
 
@@ -541,6 +578,9 @@ class CarrierInvoiceViewSet(viewsets.ModelViewSet):
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(employer_id=employer_id)
+        vendor_id = self.request.query_params.get('vendor')
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
         return qs
 
     @action(detail=True, methods=['post'])
@@ -657,16 +697,16 @@ class ReimbursementViewSet(viewsets.ModelViewSet):
 
 class EligibilityRecordViewSet(viewsets.ModelViewSet):
     queryset = EligibilityRecord.objects.select_related(
-        'employee', 'employee__employer', 'carrier', 'plan', 'plan__product'
+        'employee', 'employee__employer', 'vendor', 'plan', 'plan__product'
     ).all()
     serializer_class = EligibilityRecordSerializer
     permission_classes = [IsStaffOrAbove]
 
     def get_queryset(self):
         qs = super().get_queryset()
-        carrier_id = self.request.query_params.get('carrier')
-        if carrier_id:
-            qs = qs.filter(carrier_id=carrier_id)
+        vendor_id = self.request.query_params.get('vendor') or self.request.query_params.get('carrier')
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
         employer_id = self.request.query_params.get('employer')
         if employer_id:
             qs = qs.filter(employee__employer_id=employer_id)
@@ -721,7 +761,7 @@ class OpenEnrollmentPeriodViewSet(viewsets.ModelViewSet):
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.select_related('employer', 'carrier', 'employee').all()
+    queryset = Document.objects.select_related('employer', 'vendor', 'employee').all()
     serializer_class = DocumentSerializer
     permission_classes = [IsEmployerOrAbove]
 
@@ -778,7 +818,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
 class EmployerInvoiceViewSet(viewsets.ModelViewSet):
     queryset = EmployerInvoice.objects.select_related('employer').prefetch_related(
-        'lines__employee', 'lines__plan', 'lines__plan__product', 'lines__plan__product__carrier'
+        'lines__employee', 'lines__plan', 'lines__plan__product'
     ).all()
     serializer_class = EmployerInvoiceSerializer
     permission_classes = [IsStaffOrAbove]
@@ -797,7 +837,7 @@ class EmployerInvoiceViewSet(viewsets.ModelViewSet):
 
 
 class ExceptionViewSet(viewsets.ModelViewSet):
-    queryset = Exception.objects.select_related('employer', 'employee', 'carrier').prefetch_related('notes').all()
+    queryset = Exception.objects.select_related('employer', 'employee', 'vendor').prefetch_related('notes').all()
     serializer_class = ExceptionSerializer
     permission_classes = [IsStaffOrAbove]
 
@@ -863,45 +903,50 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @api_view(['GET'])
-def carrier_detail(request, carrier_id):
+def vendor_detail(request, vendor_id):
     try:
-        carrier = Carrier.objects.get(id=carrier_id)
-    except Carrier.DoesNotExist:
-        return Response({'error': 'Carrier not found'}, status=404)
+        vendor = Vendor.objects.get(id=vendor_id)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor not found'}, status=404)
 
-    products = BenefitProduct.objects.filter(carrier=carrier).select_related('employer').prefetch_related('tiers')
-    invoices = CarrierInvoice.objects.filter(carrier=carrier).select_related('employer').order_by('-received_date')
-    claims = Claim.objects.filter(enrollment__plan__product__carrier=carrier)
-
-    active_products = products.filter(active=True)
-    total_monthly_premium = sum(
-        t.monthly_premium for p in active_products for t in p.tiers.all()
+    allocations = PremiumAllocation.objects.filter(vendor=vendor).select_related(
+        'plan', 'plan__product', 'plan__product__employer'
     )
+    invoices = CarrierInvoice.objects.filter(vendor=vendor).select_related('employer').order_by('-received_date')
+
+    active_products = BenefitProduct.objects.filter(
+        tiers__allocations__vendor=vendor, active=True
+    ).distinct()
     active_enrollments = Enrollment.objects.filter(
-        plan__product__carrier=carrier, status__in=['active', 'carrier_confirmed']
+        plan__allocations__vendor=vendor, status__in=['active', 'carrier_confirmed']
     ).count()
     total_members = EnrollmentMember.objects.filter(
-        enrollment__plan__product__carrier=carrier,
+        enrollment__plan__allocations__vendor=vendor,
         enrollment__status__in=['active', 'carrier_confirmed'],
     ).count()
+    total_allocation = allocations.aggregate(total=Sum('amount'))['total'] or 0
 
-    claims_paid = claims.filter(status='paid').aggregate(total=Sum('paid_amount'))['total'] or 0
-    claims_pending = claims.filter(status__in=['received', 'in_review', 'pending_info']).count()
+    if vendor.vendor_type == 'carrier':
+        claims = Claim.objects.filter(enrollment__plan__allocations__vendor=vendor)
+        claims_paid = claims.filter(status='paid').aggregate(total=Sum('paid_amount'))['total'] or 0
+        claims_pending = claims.filter(status__in=['received', 'in_review', 'pending_info']).count()
+    else:
+        claims_paid = 0
+        claims_pending = 0
 
     total_billed = invoices.aggregate(total=Sum('billed_amount'))['total'] or 0
     total_discrepancies = invoices.filter(status='discrepancy').count()
-
-    employers_served = products.values('employer').distinct().count()
+    employers_served = allocations.values('plan__product__employer').distinct().count()
 
     return Response({
-        'carrier': CarrierSerializer(carrier).data,
+        'vendor': VendorSerializer(vendor).data,
         'products': BenefitProductSerializer(active_products, many=True).data,
         'invoices': CarrierInvoiceSerializer(invoices[:10], many=True).data,
         'summary': {
             'active_products': active_products.count(),
             'active_enrollments': active_enrollments,
             'total_members': total_members,
-            'total_monthly_premium': total_monthly_premium,
+            'total_monthly_allocation': total_allocation,
             'employers_served': employers_served,
             'claims_paid': claims_paid,
             'claims_pending': claims_pending,
@@ -987,8 +1032,8 @@ def employee_portal(request, employee_id):
         return Response({'error': 'Employee not found'}, status=404)
 
     enrollments = Enrollment.objects.filter(employee=employee).select_related(
-        'plan', 'plan__carrier'
-    ).prefetch_related('members', 'members__dependent')
+        'plan', 'plan__product'
+    ).prefetch_related('members', 'members__dependent', 'plan__allocations__vendor')
     deductions = PayrollDeduction.objects.filter(
         enrollment__employee=employee
     ).select_related('enrollment__plan').order_by('-period_start')
@@ -1025,9 +1070,9 @@ def employer_portal(request, employer_id):
 
     employees = Employee.objects.filter(employer=employer)
     enrollments = Enrollment.objects.filter(employee__employer=employer).select_related(
-        'employee', 'plan', 'plan__carrier'
-    ).prefetch_related('members', 'members__dependent')
-    invoices = CarrierInvoice.objects.filter(employer=employer).select_related('carrier')
+        'employee', 'plan', 'plan__product'
+    ).prefetch_related('members', 'members__dependent', 'plan__allocations__vendor')
+    invoices = CarrierInvoice.objects.filter(employer=employer).select_related('vendor')
     deductions = PayrollDeduction.objects.filter(
         enrollment__employee__employer=employer
     ).select_related('enrollment__employee', 'enrollment__plan')
@@ -1057,16 +1102,21 @@ def employer_portal(request, employer_id):
 
 
 @api_view(['GET'])
-def broker_portal(request, broker_id):
+def broker_portal(request, vendor_id):
     try:
-        broker = Broker.objects.get(id=broker_id)
-    except Broker.DoesNotExist:
+        vendor = Vendor.objects.get(id=vendor_id, vendor_type='broker')
+    except Vendor.DoesNotExist:
         return Response({'error': 'Broker not found'}, status=404)
 
-    employers = Employer.objects.filter(broker=broker)
+    employer_ids = PremiumAllocation.objects.filter(
+        vendor=vendor
+    ).values_list('plan__product__employer_id', flat=True).distinct()
+    employers = Employer.objects.filter(id__in=employer_ids)
+
     employer_data = []
     total_premium_volume = 0
     total_employees = 0
+    total_commission = 0
 
     for emp in employers:
         active_enrollments = Enrollment.objects.filter(
@@ -1075,8 +1125,13 @@ def broker_portal(request, broker_id):
         ).select_related('plan')
         monthly_premium = sum(e.plan.monthly_premium for e in active_enrollments)
         emp_employees = emp.employees.filter(status='active').count()
+        broker_alloc = PremiumAllocation.objects.filter(
+            vendor=vendor, plan__product__employer=emp
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
         total_premium_volume += monthly_premium
         total_employees += emp_employees
+        total_commission += float(broker_alloc)
 
         employer_data.append({
             'id': emp.id,
@@ -1085,17 +1140,17 @@ def broker_portal(request, broker_id):
             'active_employees': emp_employees,
             'active_enrollments': active_enrollments.count(),
             'monthly_premium': monthly_premium,
-            'commission': monthly_premium * broker.commission_rate / 100,
+            'commission': broker_alloc,
         })
 
     data = {
-        'broker': BrokerSerializer(broker).data,
+        'vendor': VendorSerializer(vendor).data,
         'employers': employer_data,
         'summary': {
             'total_employers': employers.count(),
             'total_employees': total_employees,
             'total_premium_volume': total_premium_volume,
-            'total_monthly_commission': total_premium_volume * broker.commission_rate / 100,
+            'total_monthly_commission': total_commission,
         },
     }
     return Response(data)
@@ -1178,7 +1233,7 @@ def dashboard(request):
         'total_employers': employers.count(),
         'total_employees': Employee.objects.filter(status='active').count(),
         'total_associations': Association.objects.filter(active=True).count(),
-        'total_brokers': Broker.objects.filter(active=True).count(),
+        'total_brokers': Vendor.objects.filter(vendor_type='broker', active=True).count(),
         'active_enrollments': active_enrollments.count(),
         'pending_enrollments': Enrollment.objects.filter(status='pending').count(),
         'pending_invoices': CarrierInvoice.objects.filter(status='pending').count(),

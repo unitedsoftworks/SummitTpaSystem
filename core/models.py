@@ -28,39 +28,33 @@ class Association(models.Model):
         return Employee.objects.filter(employer__association=self, status='active').count()
 
 
-class Broker(models.Model):
+class Vendor(models.Model):
+    VENDOR_TYPE_CHOICES = [
+        ('carrier', 'Insurance Carrier'),
+        ('broker', 'Broker'),
+        ('tpa', 'TPA Admin'),
+        ('other', 'Other'),
+    ]
     name = models.CharField(max_length=200)
+    vendor_type = models.CharField(max_length=20, choices=VENDOR_TYPE_CHOICES)
+    contact_name = models.CharField(max_length=200, blank=True)
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(max_length=20, blank=True)
     agency = models.CharField(max_length=200, blank=True)
-    email = models.EmailField()
-    phone = models.CharField(max_length=20, blank=True)
     license_number = models.CharField(max_length=50, blank=True)
-    license_state = models.CharField(max_length=2, default='AR')
-    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    license_state = models.CharField(max_length=2, blank=True)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_vendor_type_display()})"
 
     @property
     def employer_count(self):
-        return self.employers.count()
-
-
-class Carrier(models.Model):
-    name = models.CharField(max_length=200)
-    carrier_type = models.CharField(max_length=50, choices=[
-        ('medical', 'Medical'),
-        ('dental', 'Dental'),
-        ('vision', 'Vision'),
-        ('life', 'Life'),
-    ])
-    contact_name = models.CharField(max_length=200, blank=True)
-    contact_email = models.EmailField(blank=True)
-    contact_phone = models.CharField(max_length=20, blank=True)
-
-    def __str__(self):
-        return f"{self.name} ({self.get_carrier_type_display()})"
+        return Employer.objects.filter(
+            products__tiers__allocations__vendor=self
+        ).distinct().count()
 
 
 class Employer(models.Model):
@@ -71,7 +65,6 @@ class Employer(models.Model):
     contact_email = models.EmailField()
     contact_phone = models.CharField(max_length=20, blank=True)
     association = models.ForeignKey(Association, on_delete=models.SET_NULL, null=True, blank=True, related_name='employers')
-    broker = models.ForeignKey(Broker, on_delete=models.SET_NULL, null=True, blank=True, related_name='employers')
     billing_cycle_day = models.IntegerField(default=1)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -88,9 +81,16 @@ class Employer(models.Model):
         return self.employees.filter(status='active').count()
 
     @property
+    def all_vendors(self):
+        return Vendor.objects.filter(
+            allocations__plan__product__employer=self
+        ).distinct()
+
+    @property
     def all_brokers(self):
-        return Broker.objects.filter(
-            product_assignments__employer=self
+        return Vendor.objects.filter(
+            vendor_type='broker',
+            allocations__plan__product__employer=self
         ).distinct()
 
 
@@ -119,12 +119,10 @@ class BenefitProduct(models.Model):
         ('direct_to_vendor', 'Direct to Vendor'),
     ]
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='products')
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='products')
     plan_type_ref = models.ForeignKey(
         'benefits.PlanType', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='products',
     )
-    brokers = models.ManyToManyField(Broker, blank=True, related_name='product_assignments')
     name = models.CharField(max_length=200)
     plan_type = models.CharField(max_length=50, choices=[
         ('medical', 'Medical'),
@@ -157,15 +155,22 @@ class BenefitPlan(models.Model):
         ('employee_children', 'Employee + Children'),
         ('family', 'Family'),
     ])
-    monthly_premium = models.DecimalField(max_digits=10, decimal_places=2)
-    employer_contribution = models.DecimalField(max_digits=10, decimal_places=2)
-    employee_deduction = models.DecimalField(max_digits=10, decimal_places=2)
+    monthly_premium = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    employer_contribution = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    employee_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     class Meta:
         unique_together = ['product', 'tier']
 
     def __str__(self):
         return f"{self.product.name} - {self.get_tier_display()}"
+
+    def update_premium_from_allocations(self):
+        from django.db.models import Sum
+        total = self.allocations.aggregate(total=Sum('amount'))['total'] or 0
+        if self.monthly_premium != total:
+            self.monthly_premium = total
+            self.save(update_fields=['monthly_premium'])
 
     @property
     def name(self):
@@ -174,10 +179,6 @@ class BenefitPlan(models.Model):
     @property
     def plan_type(self):
         return self.product.plan_type
-
-    @property
-    def carrier(self):
-        return self.product.carrier
 
     @property
     def employer(self):
@@ -190,6 +191,29 @@ class BenefitPlan(models.Model):
     @property
     def active(self):
         return self.product.active
+
+
+class PremiumAllocation(models.Model):
+    plan = models.ForeignKey(BenefitPlan, on_delete=models.CASCADE, related_name='allocations')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='allocations')
+    label = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        unique_together = ['plan', 'vendor']
+        ordering = ['-amount']
+
+    def __str__(self):
+        return f"{self.vendor.name} - {self.label}: ${self.amount}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.plan.update_premium_from_allocations()
+
+    def delete(self, *args, **kwargs):
+        plan = self.plan
+        super().delete(*args, **kwargs)
+        plan.update_premium_from_allocations()
 
 
 class AbstractPerson(models.Model):
@@ -393,7 +417,7 @@ class PayrollDeduction(models.Model):
 
 
 class CarrierInvoice(models.Model):
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='invoices')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='invoices')
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='invoices')
     invoice_number = models.CharField(max_length=100)
     billing_period_start = models.DateField()
@@ -414,7 +438,7 @@ class CarrierInvoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Invoice {self.invoice_number} - {self.carrier.name}"
+        return f"Invoice {self.invoice_number} - {self.vendor.name}"
 
     def save(self, *args, **kwargs):
         self.discrepancy = self.billed_amount - self.expected_amount
@@ -574,7 +598,7 @@ class Reimbursement(models.Model):
 
 class EligibilityRecord(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='eligibility_records')
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='eligibility_records')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='eligibility_records')
     plan = models.ForeignKey(BenefitPlan, on_delete=models.CASCADE, related_name='eligibility_records')
     file_type = models.CharField(max_length=20, choices=[
         ('834_initial', '834 Initial'),
@@ -605,7 +629,7 @@ class EligibilityRecord(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.get_file_type_display()} - {self.employee.full_name} ({self.carrier.name})"
+        return f"{self.get_file_type_display()} - {self.employee.full_name} ({self.vendor.name})"
 
 
 class CobraEvent(models.Model):
@@ -703,7 +727,7 @@ class Document(models.Model):
         ('other', 'Other'),
     ])
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='documents', null=True, blank=True)
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='documents', null=True, blank=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='documents', null=True, blank=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='documents', null=True, blank=True)
     file_name = models.CharField(max_length=300)
     file_size = models.IntegerField(default=0)
@@ -852,7 +876,7 @@ class Exception(models.Model):
     due_date = models.DateField(null=True, blank=True)
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, null=True, blank=True, related_name='exceptions')
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, blank=True, related_name='exceptions')
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, null=True, blank=True, related_name='exceptions')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, null=True, blank=True, related_name='exceptions')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
