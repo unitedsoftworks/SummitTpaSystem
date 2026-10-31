@@ -11,7 +11,8 @@ from accounts.permissions import IsAdmin, IsStaffOrAbove, IsAssociationOrAbove, 
 from .models import (
     Association, Vendor, Employer, Location, BenefitProduct, BenefitPlan,
     PremiumAllocation, Employee,
-    Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
+    Dependent, Enrollment, EnrollmentAllocation, EnrollmentMember, Claim,
+    PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
     EmployerInvoice, EmployerInvoiceLine, Exception, ExceptionNote,
@@ -283,7 +284,7 @@ class DependentViewSet(viewsets.ModelViewSet):
 class EnrollmentViewSet(viewsets.ModelViewSet):
     queryset = Enrollment.objects.select_related(
         'employee', 'employee__employer', 'plan', 'plan__product'
-    ).prefetch_related('members', 'members__dependent', 'plan__allocations__vendor').all()
+    ).prefetch_related('members', 'members__dependent', 'plan__allocations__vendor', 'allocations__vendor').all()
     serializer_class = EnrollmentSerializer
     permission_classes = [IsEmployerOrAbove]
 
@@ -301,6 +302,45 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         if s:
             qs = qs.filter(status=s)
         return qs
+
+    def perform_create(self, serializer):
+        enrollment = serializer.save()
+        enrollment.snapshot_rates()
+
+    @action(detail=True, methods=['put'])
+    def rates(self, request, pk=None):
+        from decimal import Decimal
+        enrollment = self.get_object()
+        data = request.data
+        if 'employer_contribution' in data:
+            enrollment.employer_contribution = Decimal(str(data['employer_contribution']))
+        if 'employee_deduction' in data:
+            enrollment.employee_deduction = Decimal(str(data['employee_deduction']))
+        allocations = data.get('allocations')
+        if allocations is not None:
+            enrollment.allocations.all().delete()
+            for alloc_data in allocations:
+                if 'vendor' in alloc_data and not isinstance(alloc_data['vendor'], Vendor):
+                    alloc_data['vendor_id'] = alloc_data.pop('vendor')
+                EnrollmentAllocation.objects.create(enrollment=enrollment, **alloc_data)
+            from django.db.models import Sum
+            total = enrollment.allocations.aggregate(total=Sum('amount'))['total'] or 0
+            enrollment.monthly_premium = total
+            enrollment.employee_deduction = total - (enrollment.employer_contribution or 0)
+        enrollment.save()
+        enrollment = Enrollment.objects.select_related(
+            'employee', 'employee__employer', 'plan', 'plan__product'
+        ).prefetch_related('members', 'members__dependent', 'allocations__vendor').get(pk=enrollment.pk)
+        return Response(EnrollmentSerializer(enrollment).data)
+
+    @action(detail=True, methods=['post'])
+    def resnapshot(self, request, pk=None):
+        enrollment = self.get_object()
+        enrollment.snapshot_rates()
+        enrollment = Enrollment.objects.select_related(
+            'employee', 'employee__employer', 'plan', 'plan__product'
+        ).prefetch_related('members', 'members__dependent', 'allocations__vendor').get(pk=enrollment.pk)
+        return Response(EnrollmentSerializer(enrollment).data)
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

@@ -290,11 +290,49 @@ class Enrollment(models.Model):
     termination_date = models.DateField(null=True, blank=True)
     carrier_confirmation_number = models.CharField(max_length=100, blank=True)
     carrier_confirmed_at = models.DateTimeField(null=True, blank=True)
+    monthly_premium = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    employer_contribution = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    employee_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.employee} - {self.plan}"
+
+    def snapshot_rates(self):
+        self.monthly_premium = self.plan.monthly_premium
+        self.employer_contribution = self.plan.employer_contribution
+        self.employee_deduction = self.plan.employee_deduction
+        self.save(update_fields=['monthly_premium', 'employer_contribution', 'employee_deduction'])
+        self.allocations.all().delete()
+        for alloc in self.plan.allocations.all():
+            EnrollmentAllocation.objects.create(
+                enrollment=self,
+                vendor=alloc.vendor,
+                label=alloc.label,
+                amount=alloc.amount,
+            )
+
+    def update_premium_from_allocations(self):
+        from django.db.models import Sum
+        total = self.allocations.aggregate(total=Sum('amount'))['total'] or 0
+        if self.monthly_premium != total:
+            self.monthly_premium = total
+            self.employee_deduction = total - (self.employer_contribution or 0)
+            self.save(update_fields=['monthly_premium', 'employee_deduction'])
+
+
+class EnrollmentAllocation(models.Model):
+    enrollment = models.ForeignKey('Enrollment', on_delete=models.CASCADE, related_name='allocations')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='enrollment_allocations')
+    label = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['-amount']
+
+    def __str__(self):
+        return f"{self.vendor.name} - {self.label}: ${self.amount}"
 
 
 class EnrollmentMember(models.Model):

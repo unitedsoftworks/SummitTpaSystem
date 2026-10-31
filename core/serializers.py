@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import (
     Association, Vendor, Employer, Location, BenefitProduct, BenefitPlan,
     PremiumAllocation, Employee,
-    Dependent, Enrollment, EnrollmentMember, Claim, PayrollDeduction,
+    Dependent, Enrollment, EnrollmentAllocation, EnrollmentMember, Claim,
+    PayrollDeduction,
     CarrierInvoice, AuditLog, Message, LifeEvent, Reimbursement, Payment,
     EligibilityRecord, CobraEvent, OpenEnrollmentPeriod, Document, Notification,
     EmployerInvoice, EmployerInvoiceLine, Exception, ExceptionNote,
@@ -159,22 +160,29 @@ class EnrollmentMemberSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class EnrollmentAllocationSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    vendor_type = serializers.CharField(source='vendor.vendor_type', read_only=True)
+
+    class Meta:
+        model = EnrollmentAllocation
+        fields = '__all__'
+
+
 class EnrollmentSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     employer_name = serializers.CharField(source='employee.employer.name', read_only=True)
     plan_name = serializers.CharField(source='plan.product.name', read_only=True)
     plan_type = serializers.CharField(source='plan.product.plan_type', read_only=True)
     carrier_name = serializers.SerializerMethodField()
-    employee_deduction = serializers.DecimalField(
-        source='plan.employee_deduction', max_digits=10, decimal_places=2, read_only=True
-    )
-    monthly_premium = serializers.DecimalField(
+    plan_monthly_premium = serializers.DecimalField(
         source='plan.monthly_premium', max_digits=10, decimal_places=2, read_only=True
     )
     tier = serializers.CharField(source='plan.tier', read_only=True)
     tier_display = serializers.CharField(source='plan.get_tier_display', read_only=True)
     member_count = serializers.SerializerMethodField()
     members = EnrollmentMemberSerializer(many=True, read_only=True)
+    allocations = EnrollmentAllocationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Enrollment
@@ -184,6 +192,9 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         return obj.members.count()
 
     def get_carrier_name(self, obj):
+        alloc = obj.allocations.filter(vendor__vendor_type='carrier').first()
+        if alloc:
+            return alloc.vendor.name
         alloc = obj.plan.allocations.filter(vendor__vendor_type='carrier').first()
         return alloc.vendor.name if alloc else None
 
