@@ -122,6 +122,8 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
             allocations = tier_data.pop('allocations', [])
             plan = BenefitPlan.objects.create(product=product, **tier_data)
             for alloc_data in allocations:
+                if 'vendor' in alloc_data and not isinstance(alloc_data['vendor'], Vendor):
+                    alloc_data['vendor_id'] = alloc_data.pop('vendor')
                 PremiumAllocation.objects.create(plan=plan, **alloc_data)
 
         AuditLog.objects.create(
@@ -160,6 +162,8 @@ class BenefitProductViewSet(viewsets.ModelViewSet):
                 if allocations is not None:
                     t.allocations.all().delete()
                     for alloc_data in allocations:
+                        if 'vendor' in alloc_data and not isinstance(alloc_data['vendor'], Vendor):
+                            alloc_data['vendor_id'] = alloc_data.pop('vendor')
                         PremiumAllocation.objects.create(plan=t, **alloc_data)
             for tier_key, t in existing_tiers.items():
                 if tier_key not in incoming_tier_keys:

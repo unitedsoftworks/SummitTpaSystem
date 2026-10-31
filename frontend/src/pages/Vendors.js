@@ -11,12 +11,13 @@ const typeColors = {
 
 const emptyForm = {
   name: '', vendor_type: 'carrier', contact_name: '', contact_email: '', contact_phone: '',
-  agency: '', license_number: '', license_state: '',
+  agency: '', license_number: '', license_state: '', commission_rate: '',
 };
 
 export default function Vendors() {
   const [vendors, setVendors] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editVendor, setEditVendor] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -28,14 +29,46 @@ export default function Vendors() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const openCreate = () => {
+    setEditVendor(null);
+    setForm(emptyForm);
+    setError('');
+    setShowModal(true);
+  };
+
+  const openEdit = (vendor, e) => {
+    e.stopPropagation();
+    setEditVendor(vendor);
+    setForm({
+      name: vendor.name,
+      vendor_type: vendor.vendor_type,
+      contact_name: vendor.contact_name || '',
+      contact_email: vendor.contact_email || '',
+      contact_phone: vendor.contact_phone || '',
+      agency: vendor.agency || '',
+      license_number: vendor.license_number || '',
+      license_state: vendor.license_state || '',
+      commission_rate: vendor.commission_rate || '',
+    });
+    setError('');
+    setShowModal(true);
+  };
+
+  const closeModal = () => { setShowModal(false); setEditVendor(null); setError(''); };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      await api.post('/vendors/', form);
-      setShowModal(false);
-      setForm(emptyForm);
+      const payload = { ...form };
+      if (!payload.commission_rate) payload.commission_rate = null;
+      if (editVendor) {
+        await api.put(`/vendors/${editVendor.id}/`, payload);
+      } else {
+        await api.post('/vendors/', payload);
+      }
+      closeModal();
       load();
     } catch (err) {
       const data = err.response?.data;
@@ -43,7 +76,7 @@ export default function Vendors() {
         const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
         setError(msgs.join(' | '));
       } else {
-        setError('Failed to create vendor.');
+        setError('Failed to save vendor.');
       }
     } finally {
       setSaving(false);
@@ -67,7 +100,7 @@ export default function Vendors() {
             {vendors.length} vendors across {Object.keys(byType).length} types
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14m-7-7h14"/></svg>
           Add Vendor
         </button>
@@ -145,6 +178,20 @@ export default function Vendors() {
                     </span>
                   )}
                 </div>
+                <button
+                  onClick={(e) => openEdit(vendor, e)}
+                  style={{
+                    background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit
+                </button>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18l6-6-6-6" />
                 </svg>
@@ -179,11 +226,11 @@ export default function Vendors() {
 
       {/* Modal */}
       {showModal && (
-        <div style={overlay} onClick={() => setShowModal(false)}>
+        <div style={overlay} onClick={closeModal}>
           <div style={modal} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Add Vendor</h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', padding: 4, color: 'var(--text-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{editVendor ? 'Edit Vendor' : 'Add Vendor'}</h3>
+              <button onClick={closeModal} style={{ background: 'none', border: 'none', padding: 4, color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
@@ -232,7 +279,7 @@ export default function Vendors() {
                     Agency
                     <input type="text" value={form.agency} onChange={e => set('agency', e.target.value)} style={inputStyle} placeholder="Agency name" />
                   </label>
-                  <div style={fieldGrid}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
                     <label style={labelStyle}>
                       License Number
                       <input type="text" value={form.license_number} onChange={e => set('license_number', e.target.value)} style={inputStyle} placeholder="AR-INS-12345" />
@@ -241,14 +288,18 @@ export default function Vendors() {
                       License State
                       <input type="text" value={form.license_state} onChange={e => set('license_state', e.target.value)} style={inputStyle} maxLength={2} placeholder="AR" />
                     </label>
+                    <label style={labelStyle}>
+                      Commission Rate %
+                      <input type="number" step="0.01" min="0" max="100" value={form.commission_rate} onChange={e => set('commission_rate', e.target.value)} style={inputStyle} placeholder="5.00" />
+                    </label>
                   </div>
                 </>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="button" className="btn-outline" onClick={closeModal}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Creating...' : 'Create Vendor'}
+                  {saving ? 'Saving...' : editVendor ? 'Save Changes' : 'Create Vendor'}
                 </button>
               </div>
             </form>

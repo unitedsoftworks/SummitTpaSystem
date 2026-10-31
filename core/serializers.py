@@ -75,6 +75,7 @@ class BenefitProductSerializer(serializers.ModelSerializer):
     payment_arrangement_display = serializers.CharField(source='get_payment_arrangement_display', read_only=True)
     total_enrolled = serializers.SerializerMethodField()
     vendor_names = serializers.SerializerMethodField()
+    carrier_name = serializers.SerializerMethodField()
 
     class Meta:
         model = BenefitProduct
@@ -92,6 +93,12 @@ class BenefitProductSerializer(serializers.ModelSerializer):
                 allocations__plan__product=obj
             ).values_list('name', flat=True).distinct()
         )
+
+    def get_carrier_name(self, obj):
+        alloc = PremiumAllocation.objects.filter(
+            plan__product=obj, vendor__vendor_type='carrier'
+        ).first()
+        return alloc.vendor.name if alloc else None
 
 
 class BenefitPlanSerializer(serializers.ModelSerializer):

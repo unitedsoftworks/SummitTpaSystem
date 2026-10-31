@@ -24,7 +24,21 @@ const tierShort = {
 
 const allTiers = ['employee_only', 'employee_spouse', 'employee_children', 'family'];
 
-const blankTierRow = () => ({ enabled: false, monthly_premium: '', employer_contribution: '', employee_deduction: '' });
+const defaultLabel = (vendorType) => {
+  switch (vendorType) {
+    case 'carrier': return 'Carrier Premium';
+    case 'tpa': return 'TPA Admin Fee';
+    case 'broker': return 'Broker Fee';
+    default: return 'Service Fee';
+  }
+};
+
+const blankTierRow = () => ({
+  enabled: false,
+  employer_contribution: '',
+  employee_deduction: '',
+  allocations: [],
+});
 
 function buildTierRows(existingTiers) {
   const rows = {};
@@ -34,32 +48,41 @@ function buildTierRows(existingTiers) {
       rows[t.tier] = {
         id: t.id,
         enabled: true,
-        monthly_premium: t.monthly_premium,
         employer_contribution: t.employer_contribution,
         employee_deduction: t.employee_deduction,
         enrollment_count: t.enrollment_count || 0,
+        allocations: (t.allocations || []).map(a => ({
+          vendor: a.vendor,
+          label: a.label,
+          amount: a.amount,
+        })),
       };
     });
   }
   return rows;
 }
 
+function tierPremium(row) {
+  return row.allocations.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+}
+
 export default function Plans() {
   const [products, setProducts] = useState([]);
   const [employers, setEmployers] = useState([]);
-  const [carriers, setCarriers] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [employerFilter, setEmployerFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
-  const [form, setForm] = useState({ employer: '', carrier: '', name: '', plan_type: 'medical', effective_date: '', active: true });
+  const [form, setForm] = useState({ employer: '', name: '', plan_type: 'medical', effective_date: '', active: true });
   const [tierRows, setTierRows] = useState(() => buildTierRows());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [expandedTiers, setExpandedTiers] = useState({});
 
   useEffect(() => {
     api.get('/employers/').then(r => setEmployers(r.data));
-    api.get('/vendors/?vendor_type=carrier').then(r => setCarriers(r.data));
+    api.get('/vendors/').then(r => setVendors(r.data));
   }, []);
 
   const loadProducts = () => {
@@ -72,8 +95,9 @@ export default function Plans() {
 
   const openCreate = () => {
     setEditProduct(null);
-    setForm({ employer: '', carrier: '', name: '', plan_type: 'medical', effective_date: '', active: true });
+    setForm({ employer: '', name: '', plan_type: 'medical', effective_date: '', active: true });
     setTierRows(buildTierRows());
+    setExpandedTiers({});
     setError('');
     setShowModal(true);
   };
@@ -82,13 +106,15 @@ export default function Plans() {
     setEditProduct(product);
     setForm({
       employer: product.employer,
-      carrier: product.carrier,
       name: product.name,
       plan_type: product.plan_type,
       effective_date: product.effective_date,
       active: product.active,
     });
     setTierRows(buildTierRows(product.tiers));
+    const expanded = {};
+    (product.tiers || []).forEach(t => { expanded[t.tier] = true; });
+    setExpandedTiers(expanded);
     setError('');
     setShowModal(true);
   };
@@ -98,21 +124,92 @@ export default function Plans() {
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const toggleTier = (tier) => {
+    setTierRows(prev => {
+      const row = prev[tier];
+      const nowEnabled = !row.enabled;
+      return {
+        ...prev,
+        [tier]: {
+          ...row,
+          enabled: nowEnabled,
+          allocations: nowEnabled ? [] : [],
+          employer_contribution: nowEnabled ? row.employer_contribution : '',
+          employee_deduction: nowEnabled ? row.employee_deduction : '',
+        },
+      };
+    });
+    if (!tierRows[tier].enabled) {
+      setExpandedTiers(prev => ({ ...prev, [tier]: true }));
+    }
+  };
+
+  const toggleExpand = (tier) => {
+    setExpandedTiers(prev => ({ ...prev, [tier]: !prev[tier] }));
+  };
+
+  const addAllocation = (tier) => {
     setTierRows(prev => ({
       ...prev,
-      [tier]: { ...prev[tier], enabled: !prev[tier].enabled },
+      [tier]: {
+        ...prev[tier],
+        allocations: [...prev[tier].allocations, { vendor: '', label: '', amount: '' }],
+      },
     }));
+  };
+
+  const removeAllocation = (tier, idx) => {
+    setTierRows(prev => ({
+      ...prev,
+      [tier]: {
+        ...prev[tier],
+        allocations: prev[tier].allocations.filter((_, i) => i !== idx),
+      },
+    }));
+  };
+
+  const setAllocationField = (tier, idx, field, value) => {
+    setTierRows(prev => {
+      const allocs = [...prev[tier].allocations];
+      allocs[idx] = { ...allocs[idx], [field]: value };
+      if (field === 'vendor' && value) {
+        const v = vendors.find(vn => String(vn.id) === String(value));
+        if (v && !allocs[idx].label) {
+          allocs[idx].label = defaultLabel(v.vendor_type);
+        }
+      }
+      const updated = { ...prev[tier], allocations: allocs };
+      const premium = tierPremium(updated);
+      const er = parseFloat(updated.employer_contribution) || 0;
+      updated.employee_deduction = Math.max(0, premium - er).toFixed(2);
+      return { ...prev, [tier]: updated };
+    });
   };
 
   const setTierField = (tier, field, value) => {
     setTierRows(prev => {
-      const t = { ...prev[tier], [field]: value };
-      if (field === 'monthly_premium' || field === 'employer_contribution') {
-        const premium = parseFloat(field === 'monthly_premium' ? value : t.monthly_premium) || 0;
-        const contrib = parseFloat(field === 'employer_contribution' ? value : t.employer_contribution) || 0;
-        t.employee_deduction = Math.max(0, premium - contrib).toFixed(2);
+      const row = { ...prev[tier], [field]: value };
+      const premium = tierPremium(row);
+      if (field === 'employer_contribution') {
+        const er = parseFloat(value) || 0;
+        row.employee_deduction = Math.max(0, premium - er).toFixed(2);
       }
-      return { ...prev, [tier]: t };
+      return { ...prev, [tier]: row };
+    });
+  };
+
+  const copyAllocationsDown = (sourceTier) => {
+    setTierRows(prev => {
+      const sourceAllocs = prev[sourceTier].allocations;
+      if (sourceAllocs.length === 0) return prev;
+      const updated = { ...prev };
+      const sourceTierIdx = allTiers.indexOf(sourceTier);
+      for (let i = sourceTierIdx + 1; i < allTiers.length; i++) {
+        const t = allTiers[i];
+        if (updated[t].enabled && updated[t].allocations.length === 0) {
+          updated[t] = { ...updated[t], allocations: sourceAllocs.map(a => ({ ...a })) };
+        }
+      }
+      return updated;
     });
   };
 
@@ -123,12 +220,23 @@ export default function Plans() {
     try {
       const enabledTiers = allTiers
         .filter(t => tierRows[t].enabled)
-        .map(t => ({
-          tier: t,
-          monthly_premium: tierRows[t].monthly_premium,
-          employer_contribution: tierRows[t].employer_contribution,
-          employee_deduction: tierRows[t].employee_deduction,
-        }));
+        .map(t => {
+          const row = tierRows[t];
+          const premium = tierPremium(row);
+          return {
+            tier: t,
+            monthly_premium: premium.toFixed(2),
+            employer_contribution: row.employer_contribution || '0',
+            employee_deduction: row.employee_deduction || '0',
+            allocations: row.allocations
+              .filter(a => a.vendor && a.amount)
+              .map(a => ({
+                vendor: parseInt(a.vendor),
+                label: a.label || 'Fee',
+                amount: parseFloat(a.amount).toFixed(2),
+              })),
+          };
+        });
       if (enabledTiers.length === 0) {
         setError('At least one tier is required.');
         setSaving(false);
@@ -168,7 +276,7 @@ export default function Plans() {
           <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>Benefits</div>
           <h2 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 700 }}>Plan Management</h2>
           <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', maxWidth: 600 }}>
-            View and manage benefit products, tiers, and premium rates across all employers.
+            View and manage benefit products, tiers, and premium allocations across all employers.
           </p>
         </div>
         <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -227,7 +335,7 @@ export default function Plans() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{product.name}</div>
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {product.employer_name} &middot; {product.carrier_name}
+                    {product.employer_name}{product.carrier_name ? ` · ${product.carrier_name}` : ''}
                   </div>
                 </div>
                 <span style={{
@@ -262,6 +370,7 @@ export default function Plans() {
                     <th style={{ ...thStyle, textAlign: 'right' }}>Monthly Premium</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Employer Pays</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Employee Pays</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Vendors</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Enrolled</th>
                   </tr>
                 </thead>
@@ -279,6 +388,9 @@ export default function Plans() {
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right', color: '#3b82f6' }}>
                         ${parseFloat(t.employee_deduction).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {(t.allocations || []).length}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <span style={{
@@ -311,7 +423,7 @@ export default function Plans() {
               <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
                 {editProduct ? 'Edit Product' : 'Add Product'}
               </h3>
-              <button onClick={closeModal} style={{ background: 'none', padding: 4, color: 'var(--text-muted)' }}>
+              <button onClick={closeModal} style={{ background: 'none', padding: 4, color: 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
@@ -324,19 +436,12 @@ export default function Plans() {
 
             <form onSubmit={submit}>
               {/* Product info row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 16 }}>
                 <label style={labelStyle}>
                   Employer *
                   <select required value={form.employer} onChange={e => setField('employer', e.target.value)} style={inputStyle}>
                     <option value="">Select</option>
                     {employers.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
-                </label>
-                <label style={labelStyle}>
-                  Carrier *
-                  <select required value={form.carrier} onChange={e => setField('carrier', e.target.value)} style={inputStyle}>
-                    <option value="">Select</option>
-                    {carriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </label>
                 <label style={labelStyle}>
@@ -361,87 +466,174 @@ export default function Plans() {
                 </label>
               </div>
 
-              {/* Tier rate table */}
+              {/* Tier sections */}
               <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: 'var(--text)' }}>Rate Tiers</div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ ...modalThStyle, width: 40 }}></th>
-                      <th style={{ ...modalThStyle, textAlign: 'left' }}>Tier</th>
-                      <th style={modalThStyle}>Monthly Premium</th>
-                      <th style={modalThStyle}>ER Contribution</th>
-                      <th style={modalThStyle}>EE Deduction</th>
-                      {editProduct && <th style={{ ...modalThStyle, width: 60 }}>Enrolled</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allTiers.map(tier => {
-                      const row = tierRows[tier];
-                      const hasEnrollments = (row.enrollment_count || 0) > 0;
-                      return (
-                        <tr key={tier} style={{
-                          borderBottom: '1px solid var(--border)',
-                          background: row.enabled ? 'var(--card)' : 'var(--bg)',
-                          opacity: row.enabled ? 1 : 0.6,
-                        }}>
-                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={row.enabled}
-                              onChange={() => {
-                                if (row.enabled && hasEnrollments) return;
-                                toggleTier(tier);
-                              }}
-                              disabled={row.enabled && hasEnrollments}
-                              title={row.enabled && hasEnrollments ? 'Cannot remove tier with active enrollments' : ''}
-                              style={{ accentColor: 'var(--accent)', cursor: row.enabled && hasEnrollments ? 'not-allowed' : 'pointer', width: 16, height: 16 }}
-                            />
-                          </td>
-                          <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: row.enabled ? 'var(--text)' : 'var(--text-muted)' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: 'var(--text)' }}>Rate Tiers & Vendor Allocations</div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {allTiers.map(tier => {
+                    const row = tierRows[tier];
+                    const hasEnrollments = (row.enrollment_count || 0) > 0;
+                    const premium = row.enabled ? tierPremium(row) : 0;
+                    const isExpanded = expandedTiers[tier];
+
+                    return (
+                      <div key={tier} style={{
+                        border: '1px solid var(--border)',
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        background: row.enabled ? 'var(--card)' : 'var(--bg)',
+                        opacity: row.enabled ? 1 : 0.6,
+                      }}>
+                        {/* Tier header row */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                          cursor: row.enabled ? 'pointer' : 'default',
+                        }} onClick={() => row.enabled && toggleExpand(tier)}>
+                          <input
+                            type="checkbox"
+                            checked={row.enabled}
+                            onChange={(e) => { e.stopPropagation(); if (row.enabled && hasEnrollments) return; toggleTier(tier); }}
+                            disabled={row.enabled && hasEnrollments}
+                            title={row.enabled && hasEnrollments ? 'Cannot remove tier with active enrollments' : ''}
+                            style={{ accentColor: 'var(--accent)', cursor: row.enabled && hasEnrollments ? 'not-allowed' : 'pointer', width: 16, height: 16 }}
+                          />
+                          <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: row.enabled ? 'var(--text)' : 'var(--text-muted)' }}>
                             {tierLabels[tier]}
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              type="number" step="0.01" min="0"
-                              required={row.enabled}
-                              disabled={!row.enabled}
-                              value={row.enabled ? row.monthly_premium : ''}
-                              onChange={e => setTierField(tier, 'monthly_premium', e.target.value)}
-                              style={tableInputStyle(row.enabled)}
-                              placeholder="0.00"
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              type="number" step="0.01" min="0"
-                              required={row.enabled}
-                              disabled={!row.enabled}
-                              value={row.enabled ? row.employer_contribution : ''}
-                              onChange={e => setTierField(tier, 'employer_contribution', e.target.value)}
-                              style={tableInputStyle(row.enabled)}
-                              placeholder="0.00"
-                            />
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <input
-                              type="number" step="0.01" min="0"
-                              disabled
-                              value={row.enabled ? row.employee_deduction : ''}
-                              style={{ ...tableInputStyle(false), background: 'var(--bg)', color: 'var(--text-muted)' }}
-                              placeholder="Auto"
-                            />
-                          </td>
-                          {editProduct && (
-                            <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: hasEnrollments ? '#059669' : 'var(--text-muted)' }}>
-                              {row.enabled ? (row.enrollment_count || 0) : '—'}
-                            </td>
+                          </span>
+                          {row.enabled && (
+                            <>
+                              <div style={{ textAlign: 'right', minWidth: 90 }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>PREMIUM</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: row.allocations.length > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
+                                  ${premium.toFixed(2)}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right', minWidth: 80 }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>VENDORS</div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                  {row.allocations.filter(a => a.vendor).length}
+                                </div>
+                              </div>
+                              {editProduct && (
+                                <div style={{ textAlign: 'right', minWidth: 60 }}>
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>ENROLLED</div>
+                                  <div style={{ fontSize: 14, fontWeight: 600, color: hasEnrollments ? '#059669' : 'var(--text-muted)' }}>
+                                    {row.enrollment_count || 0}
+                                  </div>
+                                </div>
+                              )}
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round"
+                                style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>
+                                <path d="M6 9l6 6 6-6" />
+                              </svg>
+                            </>
                           )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        </div>
+
+                        {/* Expanded: allocations + ER/EE */}
+                        {row.enabled && isExpanded && (
+                          <div style={{ borderTop: '1px solid var(--border)', padding: '14px 14px 10px' }}>
+                            {/* Allocation rows */}
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Vendor Allocations
+                            </div>
+                            {row.allocations.length === 0 && (
+                              <div style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                No allocations yet. Add vendors to set premium breakdown.
+                              </div>
+                            )}
+                            {row.allocations.map((alloc, idx) => (
+                              <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                                <select
+                                  value={alloc.vendor}
+                                  onChange={e => setAllocationField(tier, idx, 'vendor', e.target.value)}
+                                  style={{ ...allocInputStyle, flex: 2 }}
+                                >
+                                  <option value="">Select vendor</option>
+                                  {vendors.map(v => (
+                                    <option key={v.id} value={v.id}>
+                                      {v.name} ({v.vendor_type_display || v.vendor_type})
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="text"
+                                  value={alloc.label}
+                                  onChange={e => setAllocationField(tier, idx, 'label', e.target.value)}
+                                  style={{ ...allocInputStyle, flex: 1.5 }}
+                                  placeholder="Label"
+                                />
+                                <div style={{ position: 'relative', flex: 1 }}>
+                                  <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--text-muted)' }}>$</span>
+                                  <input
+                                    type="number" step="0.01" min="0"
+                                    value={alloc.amount}
+                                    onChange={e => setAllocationField(tier, idx, 'amount', e.target.value)}
+                                    style={{ ...allocInputStyle, paddingLeft: 20, textAlign: 'right' }}
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeAllocation(tier, idx)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#ef4444', flexShrink: 0 }}
+                                  title="Remove allocation"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                    <path d="M18 6L6 18M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => addAllocation(tier)}
+                              style={{
+                                background: 'none', border: '1px dashed var(--border)', borderRadius: 6,
+                                padding: '6px 12px', fontSize: 12, fontWeight: 600, color: 'var(--accent)',
+                                cursor: 'pointer', width: '100%', marginTop: 4, marginBottom: 12,
+                              }}
+                            >
+                              + Add Vendor Allocation
+                            </button>
+
+                            {/* ER / EE split */}
+                            <div style={{ display: 'flex', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase' }}>
+                                  Total Premium
+                                </div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                                  ${premium.toFixed(2)}
+                                </div>
+                              </div>
+                              <label style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase' }}>
+                                  Employer Contribution
+                                </div>
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  value={row.employer_contribution}
+                                  onChange={e => setTierField(tier, 'employer_contribution', e.target.value)}
+                                  style={allocInputStyle}
+                                  placeholder="0.00"
+                                />
+                              </label>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase' }}>
+                                  Employee Deduction
+                                </div>
+                                <div style={{ fontSize: 16, fontWeight: 600, color: '#3b82f6', paddingTop: 6 }}>
+                                  ${(parseFloat(row.employee_deduction) || 0).toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -480,11 +672,6 @@ const thStyle = {
   color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px',
   background: 'var(--table-header-bg)',
 };
-const modalThStyle = {
-  padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700,
-  color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px',
-  background: 'var(--table-header-bg)',
-};
 const tdStyle = { padding: '12px 16px', fontSize: 14 };
 const labelStyle = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' };
 const inputStyle = {
@@ -492,9 +679,8 @@ const inputStyle = {
   fontSize: 14, background: 'var(--input-bg)', color: 'var(--text)', outline: 'none',
   fontFamily: 'inherit',
 };
-const tableInputStyle = (enabled) => ({
-  width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)',
-  fontSize: 13, background: enabled ? 'var(--input-bg)' : 'var(--bg)', color: enabled ? 'var(--text)' : 'var(--text-muted)',
-  outline: 'none', fontFamily: 'inherit', textAlign: 'right',
-  boxSizing: 'border-box',
-});
+const allocInputStyle = {
+  padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)',
+  fontSize: 13, background: 'var(--input-bg)', color: 'var(--text)', outline: 'none',
+  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+};
